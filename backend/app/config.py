@@ -32,8 +32,11 @@ DB_PATH = _path("DB_PATH", "storage/pichanter.db")
 RETENTION_HOURS = float(os.getenv("RETENTION_HOURS", "24"))
 CLEANUP_INTERVAL_S = int(os.getenv("CLEANUP_INTERVAL_S", "600"))
 
-MAX_UPLOAD_MB = float(os.getenv("MAX_UPLOAD_MB", "10"))
-MAX_PIXELS = int(os.getenv("MAX_PIXELS", str(40_000_000)))  # tolak gambar > 40 MP
+MAX_UPLOAD_MB = float(os.getenv("MAX_UPLOAD_MB", "25"))
+# Pengaman "decompression bomb": Pillow menolak gambar > 2 x MAX_PIXELS (bawaan 240 MP, cukup untuk kamera 200 MP).
+MAX_PIXELS = int(os.getenv("MAX_PIXELS", str(120_000_000)))
+# Foto lebih besar dari ini (sisi terpanjang) diperkecil dulu agar hemat memori server.
+PROCESS_MAX_SIDE = int(os.getenv("PROCESS_MAX_SIDE", "6000"))
 FEATHER = float(os.getenv("FEATHER", "1.5"))
 
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]

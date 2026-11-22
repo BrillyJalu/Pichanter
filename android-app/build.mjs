@@ -22,6 +22,12 @@ const APP_ID = "id.my.jalulabs.pichanter";
 const APP_NAME = "Pichanter";
 const MIN_SDK = 29; // PRD: Android 10+
 const GRADLE_VERSION = "8.14.3"; // sesuai template Capacitor 8 + AGP 8.13
+// Versi APK. Naikkan keduanya setiap rilis (versionCode harus selalu bertambah agar bisa dipasang menimpa).
+//  1.0 (1): rilis awal
+//  1.1 (2): semua format foto (HEIC, MPO, AVIF, SVG, ...), cadangan proses di server bila HP gagal
+//           memperkecil foto, versi di user-agent, tombol "Versi baru tersedia"
+const VERSION_NAME = "1.1";
+const VERSION_CODE = 2;
 
 // ---------------------------------------------------------------- argumen
 const args = process.argv.slice(2);
@@ -52,6 +58,7 @@ const config = {
     errorPath: "offline.html",
   },
   android: {
+    appendUserAgent: `PichanterAndroid/${VERSION_NAME}`, // dibaca PWA: versi APK + tawaran pembaruan
     allowMixedContent: cleartext, // build uji HTTP: halaman offline lokal (https://localhost) perlu cek server http
     webContentsDebuggingEnabled: cleartext, // bisa diperiksa via chrome://inspect hanya pada build uji
   },
@@ -87,6 +94,9 @@ function patch(file, fn) {
   }
 }
 
+patch(path.join(ANDROID, "app", "build.gradle"), (s) =>
+  s.replace(/versionCode\s+\d+/, `versionCode ${VERSION_CODE}`).replace(/versionName\s+"[^"]*"/, `versionName "${VERSION_NAME}"`)
+);
 patch(path.join(ANDROID, "variables.gradle"), (s) => s.replace(/minSdkVersion = \d+/, `minSdkVersion = ${MIN_SDK}`));
 
 // Kunci versi Gradle: AGP 8.x (Capacitor 8) tidak jalan di Gradle >= 9.6. Tawaran "upgrade wrapper"
@@ -151,11 +161,8 @@ if (!cleartext) {
   mkdirSync(dlDir, { recursive: true });
   const dest = path.join(dlDir, "pichanter.apk");
   cpSync(out, dest);
-  const gradle = readFileSync(path.join(ANDROID, "app", "build.gradle"), "utf8");
-  const versionName = (gradle.match(/versionName\s+"([^"]+)"/) || [])[1] || "1.0";
-  const versionCode = Number((gradle.match(/versionCode\s+(\d+)/) || [])[1] || 1);
   const meta = {
-    version: `${versionName} (${versionCode})`,
+    version: `${VERSION_NAME} (${VERSION_CODE})`,
     built_at: new Date().toISOString(),
     server: startUrl,
     min_android: "10",

@@ -84,6 +84,24 @@ public class PichanterNativePlugin extends Plugin {
         return name;
     }
 
+    /** Buka alamat di browser HP (dipakai untuk mengunduh APK versi baru). Hanya host server Pichanter. */
+    @PluginMethod
+    public void openExternal(PluginCall call) {
+        try {
+            String src = call.getString("url");
+            Uri uri = Uri.parse(src == null ? "" : src);
+            String allowedHost = Uri.parse(getBridge().getServerUrl()).getHost();
+            if (!"https".equals(uri.getScheme()) || allowedHost == null || !allowedHost.equalsIgnoreCase(uri.getHost())) {
+                throw new IOException("URL tidak diizinkan: " + src);
+            }
+            Intent view = new Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getActivity().runOnUiThread(() -> getActivity().startActivity(view));
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Gagal membuka browser: " + e.getMessage(), e);
+        }
+    }
+
     @PluginMethod
     public void saveImage(PluginCall call) {
         try {

@@ -39,6 +39,7 @@
     <div>
       <b>{{ error.title }}</b>
       <p>{{ error.msg }}</p>
+      <small v-if="error.detail" class="alert-detail">{{ error.detail }}</small>
     </div>
     <button class="icon-btn small" @click="error = null" aria-label="Tutup">
       <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -75,8 +76,17 @@
 
       <p class="fineprint">
         JPG, PNG, HEIC, WEBP, dan format gambar lain. Foto diproses di server Pichanter, tidak dikirim ke pihak ketiga,
-        dan dihapus otomatis setelah 24 jam.
+        dan dihapus otomatis setelah 24 jam.<template v-if="appVersion"> Aplikasi Android v{{ appVersion }}.</template>
       </p>
+
+      <!-- Di dalam APK lama: tawarkan versi baru -->
+      <button v-if="apkUpdate" class="install-item update" @click="openApkUpdate">
+        <span class="install-icon android">
+          <svg viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>
+        </span>
+        <span class="install-text"><b>Versi baru {{ apk.version.split(' ')[0] }} tersedia</b><small>Unduh lewat browser lalu pasang ulang · {{ apkSize }}</small></span>
+        <svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
 
       <!-- Pasang aplikasi: disembunyikan di dalam APK -->
       <div v-if="showInstall || showApk" class="install">
@@ -105,7 +115,7 @@
         <div v-else class="no-preview" :class="{ dim: busy }">
           <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9.5" r="1.5"/><path d="M20 15l-4.5-4.5L6 20"/></svg>
           <b>Foto {{ photo.label }} siap diproses</b>
-          <small>Pratinjau belum tersedia untuk format ini. Foto akan dikonversi di server.</small>
+          <small>Pratinjau tidak bisa ditampilkan di HP ini. Foto tetap diproses di server.</small>
         </div>
         <div v-if="busy" class="processing">
           <div class="scanline"></div>

@@ -83,7 +83,8 @@ def test_t4_rejects_non_image(client):
 
 
 def test_t4_rejects_oversized_file(client):
-    big = b"\xff\xd8" + b"0" * (10 * 1024 * 1024 + 10)
+    from app import config
+    big = b"\xff\xd8" + b"0" * (int(config.MAX_UPLOAD_MB * 1024 * 1024) + 10)
     r = post(client, big)
     assert r.status_code == 413
     assert client.get("/api/health").json()["status"] == "ok"   # server tetap jalan
@@ -114,6 +115,16 @@ def test_converted_transparent_original_kept_as_png(client):
     Image.new("RGBA", (64, 64), (0, 0, 0, 0)).save(buf, format="TIFF")
     job = post(client, buf.getvalue(), name="logo.tif", ctype="image/tiff").json()
     assert client.get(job["original_url"]).headers["content-type"] == "image/png"
+
+
+def test_huge_camera_photo_is_downscaled_not_rejected(client, monkeypatch):
+    from app import config
+    monkeypatch.setattr(config, "PROCESS_MAX_SIDE", 1000)
+    job = post(client, make_photo(3000, 2000, exif_orientation=6)).json()
+    assert job["status"] == "ok" and max(job["width"], job["height"]) <= 1000
+    assert job["height"] > job["width"]          # orientasi EXIF tetap diterapkan
+    job = post(client, make_photo(2400, 1800, fmt="PNG"), name="x.png", ctype="image/png").json()
+    assert (job["width"], job["height"]) == (1000, 750)
 
 
 def test_rejects_unsupported_image_format(client):

@@ -7,7 +7,7 @@ const { createApp } = Vue;
 const POLL_MS = 3000;
 const HEALTH_MS = 15000;
 const HISTORY_LIMIT = 60;
-const MAX_MB = 10;
+const MAX_MB = 25;
 const IMAGE_EXT = ["jpg", "jpeg", "jfif", "png", "webp", "heic", "heif", "avif", "bmp", "gif", "tif", "tiff", "svg"];
 
 /** SVG tidak bisa dibaca server: gambar di browser menjadi PNG (sisi terpanjang 1600 px). */

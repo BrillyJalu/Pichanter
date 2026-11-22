@@ -167,7 +167,15 @@ def open_image(data: bytes) -> tuple[Image.Image, str, bytes]:
         fmt = img.format
         if getattr(img, "n_frames", 1) > 1:
             img.seek(0)  # GIF/TIFF/MPO berlapis: pakai gambar pertama
+        side = config.PROCESS_MAX_SIDE
+        if fmt in ("JPEG", "MPO") and max(img.size) > side:
+            # Kamera 50-200 MP: dekode JPEG langsung di skala 1/2, 1/4, ... (hemat memori dan waktu).
+            s = side / max(img.size)
+            img.draft("RGB", (round(img.width * s), round(img.height * s)))
         img.load()
+        if max(img.size) > side:
+            img = ImageOps.exif_transpose(img)
+            img.thumbnail((side, side), Image.Resampling.LANCZOS)
     except Image.DecompressionBombError:
         raise HTTPException(413, "Resolusi gambar terlalu besar.")
     except (UnidentifiedImageError, OSError, SyntaxError, ValueError):
@@ -203,7 +211,7 @@ def health():
 
 @app.post("/api/jobs", tags=["jobs"], status_code=201, summary="Hapus background satu foto")
 def create_job(
-    file: UploadFile = File(..., description="Foto JPG/PNG/WEBP/HEIC/AVIF/BMP/GIF/TIFF, maks. 10 MB"),
+    file: UploadFile = File(..., description="Foto JPG/PNG/WEBP/HEIC/AVIF/BMP/GIF/TIFF, maks. 25 MB"),
     source: Literal["mobile", "web"] = Form("web", description="Asal permintaan"),
 ):
     t0 = time.perf_counter()

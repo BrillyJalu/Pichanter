@@ -64,7 +64,7 @@
              @dragover.prevent="dragOver = true" @dragleave="dragOver = false" @drop.prevent="onDrop">
         <input type="file" accept="image/*,.heic,.heif" hidden @change="onPick" :disabled="uploading">
         <svg viewBox="0 0 24 24"><path d="M12 16V5M7.5 9.5L12 5l4.5 4.5M5 19.5h14"/></svg>
-        <span v-if="!uploading"><b>Unggah dari laptop</b> atau seret foto ke sini · JPG, PNG, HEIC, WEBP, SVG, dll., maks. 10 MB</span>
+        <span v-if="!uploading"><b>Unggah dari laptop</b> atau seret foto ke sini · JPG, PNG, HEIC, WEBP, SVG, dll., maks. 25 MB</span>
         <span v-else>{{ uploadPhase === 'upload' ? 'Mengunggah ' + uploadProgress + '%' : 'Menghapus background…' }}</span>
         <i v-if="uploading" class="bar" :style="{ width: (uploadPhase === 'upload' ? uploadProgress : 100) + '%' }"></i>
       </label>

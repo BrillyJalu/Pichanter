@@ -4,7 +4,7 @@
 const { createApp } = Vue;
 
 const API = ((window.PICHANTER_CONFIG && window.PICHANTER_CONFIG.apiBase) || "").replace(/\/$/, "");
-const MAX_MB = 10;            // batas server untuk file yang dikirim apa adanya
+const MAX_MB = 25;            // batas server untuk file yang dikirim apa adanya
 const MAX_INPUT_MB = 40;      // batas file yang diperkecil dulu di HP
 const MAX_SIDE = 1600;
 const KEEP_ORIGINAL_MAX_BYTES = 3 * 1024 * 1024;
@@ -23,6 +23,16 @@ const OFFLINE = { title: "Server offline", msg: "Tidak bisa terhubung ke server 
 // ---------------------------------------------------------------- pasang aplikasi
 const UA = navigator.userAgent;
 const IS_ANDROID = /Android/i.test(UA);
+// APK menambahkan "PichanterAndroid/<versi>" ke user-agent sejak v1.1; APK v1.0 belum.
+const UA_APK_VERSION = (UA.match(/PichanterAndroid\/([\d.]+)/) || [])[1] || null;
+/** "1.10 (3)" > "1.9" ? */
+function newerVersion(a, b) {
+  const pa = String(a).split(" ")[0].split(".").map(Number), pb = String(b).split(" ")[0].split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+  }
+  return false;
+}
 const IS_IOS = /iPhone|iPad|iPod/.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const isStandalone = () =>
   window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
@@ -62,64 +72,99 @@ function canvasToBlob(canvas, type, quality) {
 
 const tooBig = (file, limit) =>
   ({ title: "Foto terlalu besar", msg: `Ukuran foto ${formatBytes(file.size)} melebihi batas ${limit} MB.` });
+const errName = (e) => String((e && (e.name || e.message)) || e || "?");
+
+/** Baca beberapa byte awal: memastikan file bisa dibuka (izin, foto di cloud) dan mengenali formatnya. */
+async function sniff(file) {
+  const b = new Uint8Array(await file.slice(0, 64).arrayBuffer());
+  const s = (i, n) => String.fromCharCode.apply(null, b.subarray(i, i + n));
+  if (b[0] === 0xff && b[1] === 0xd8) return "JPG";
+  if (s(1, 3) === "PNG") return "PNG";
+  if (s(0, 4) === "RIFF" && s(8, 4) === "WEBP") return "WEBP";
+  if (s(4, 4) === "ftyp") return /^avi[fs]/.test(s(8, 4)) ? "AVIF" : "HEIC";
+  if (s(0, 4) === "GIF8") return "GIF";
+  if (s(0, 2) === "BM") return "BMP";
+  if (s(0, 4) === "II*\0" || s(0, 4) === "MM\0*") return "TIFF";
+  if (/<svg|<\?xml/i.test(s(0, 64))) return "SVG";
+  return "";
+}
 
 /**
  * Siapkan foto untuk diunggah. Semua format gambar diterima:
- * - yang bisa dibaca browser (JPG, PNG, WEBP, AVIF, BMP, GIF, SVG, ...) diperkecil ke sisi terpanjang 1600 px
- *   lalu dikirim sebagai JPEG (PRD: hemat kuota);
- * - yang tidak bisa dibaca browser HP (HEIC/HEIF, TIFF) dikirim apa adanya dan dikonversi di server.
+ * - bila browser HP bisa membacanya (JPG, PNG, WEBP, AVIF, BMP, GIF, SVG, ...), foto diperkecil ke sisi
+ *   terpanjang 1600 px lalu dikirim sebagai JPEG (PRD: hemat kuota);
+ * - bila ada langkah yang gagal di HP (format HEIC/TIFF, foto 50-200 MP yang kehabisan memori, WebView lama),
+ *   file asli dikirim apa adanya dan server yang membaca, memutar, dan memperkecilnya.
  */
 async function preparePhoto(file) {
   const ext = (file.name.split(".").pop() || "").toLowerCase();
-  const svg = file.type === "image/svg+xml" || ext === "svg";
-  if (file.type && !file.type.startsWith("image/") && !IMAGE_EXT.includes(ext)) {
-    throw { title: "Bukan file gambar", msg: `${file.name || "File ini"} bukan foto. Pilih file gambar (JPG, PNG, HEIC, dll.).` };
+  const info = `${file.type || "tipe ?"} · ${formatBytes(file.size)}`;
+  const cannotOpen = (detail) => ({
+    title: "Foto tidak bisa dibuka",
+    msg: "File tidak bisa dibaca dari penyimpanan HP. Bila foto masih di cloud (Google Foto, OneDrive), unduh dulu ke HP lalu coba lagi, atau pakai Ambil Foto.",
+    detail,
+  });
+  if (!file.size) throw cannotOpen(info + " · file kosong");
+
+  let kind;
+  try {
+    kind = await sniff(file);
+  } catch (e) {
+    throw cannotOpen(`${info} · baca: ${errName(e)}`);
+  }
+  const svg = kind === "SVG" || file.type === "image/svg+xml" || ext === "svg";
+  if (!kind && !(file.type || "").startsWith("image/") && !IMAGE_EXT.includes(ext)) {
+    throw { title: "Bukan file gambar", msg: `${file.name || "File ini"} bukan foto. Pilih file gambar (JPG, PNG, HEIC, dll.).`, detail: info };
   }
   if (file.size > MAX_INPUT_MB * 1024 * 1024) throw tooBig(file, MAX_INPUT_MB);
+  const label = kind || ext.toUpperCase() || "foto";
 
-  let dec = null;
+  // Cadangan: kirim file asli, server yang mengolah.
+  const viaServer = (reason) => {
+    if (svg) throw { title: "SVG tidak bisa dibaca", msg: "File SVG rusak atau memuat isi yang tidak didukung. Coba file lain.", detail: `${info} · ${reason}` };
+    if (file.size > MAX_MB * 1024 * 1024) throw tooBig(file, MAX_MB);
+    console.warn("Pichanter: foto diproses di server", label, info, reason);
+    return { blob: file, url: null, serverConvert: true, label, reason, width: null, height: null, origWidth: null, origHeight: null, resized: false };
+  };
+
+  let dec;
   try {
     dec = await decodeImage(file, svg);
-  } catch (_) { /* format tidak dikenal browser */ }
-
-  if (!dec) {
-    if (svg) throw { title: "SVG tidak bisa dibaca", msg: "File SVG rusak atau memuat isi yang tidak didukung. Coba file lain." };
-    if (file.size > MAX_MB * 1024 * 1024) throw tooBig(file, MAX_MB);
-    return {
-      blob: file, url: null, serverConvert: true,
-      label: (ext || (file.type.split("/")[1] || "")).toUpperCase(),
-      width: null, height: null, origWidth: null, origHeight: null, resized: false,
-    };
+  } catch (e) {
+    return viaServer("dekode: " + errName(e));
   }
-
-  let origWidth = dec.src.naturalWidth || dec.src.width;
-  let origHeight = dec.src.naturalHeight || dec.src.height;
-  if (!origWidth || !origHeight) origWidth = origHeight = MAX_SIDE; // SVG tanpa ukuran
-  // SVG berupa vektor: selalu digambar dengan sisi terpanjang 1600 px.
-  const scale = svg ? MAX_SIDE / Math.max(origWidth, origHeight) : Math.min(1, MAX_SIDE / Math.max(origWidth, origHeight));
-  const width = Math.max(1, Math.round(origWidth * scale));
-  const height = Math.max(1, Math.round(origHeight * scale));
-
-  let blob = file;
   try {
+    let origWidth = dec.src.naturalWidth || dec.src.width;
+    let origHeight = dec.src.naturalHeight || dec.src.height;
+    if (!origWidth || !origHeight) {
+      if (!svg) throw new Error("ukuran 0");
+      origWidth = origHeight = MAX_SIDE; // SVG tanpa ukuran
+    }
+    // SVG berupa vektor: selalu digambar dengan sisi terpanjang 1600 px.
+    const scale = svg ? MAX_SIDE / Math.max(origWidth, origHeight) : Math.min(1, MAX_SIDE / Math.max(origWidth, origHeight));
+    const width = Math.max(1, Math.round(origWidth * scale));
+    const height = Math.max(1, Math.round(origHeight * scale));
+
+    let blob = file;
     if (svg || scale < 1 || file.type !== "image/jpeg" || file.size > KEEP_ORIGINAL_MAX_BYTES) {
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("canvas tidak tersedia");
       ctx.fillStyle = "#fff"; // gambar transparan → latar putih sebelum jadi JPEG
       ctx.fillRect(0, 0, width, height);
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(dec.src, 0, 0, width, height);
       blob = await canvasToBlob(canvas, "image/jpeg", 0.92);
+      if (!blob.size) throw new Error("hasil kosong");
     }
-  } catch (_) {
-    throw { title: "Foto tidak bisa dibaca", msg: "File rusak atau formatnya tidak dikenali. Coba foto lain." };
+    return { blob, url: URL.createObjectURL(blob), width, height, origWidth, origHeight, resized: !svg && scale < 1 };
+  } catch (e) {
+    return viaServer("perkecil: " + errName(e));
   } finally {
     dec.done();
   }
-
-  return { blob, url: URL.createObjectURL(blob), width, height, origWidth, origHeight, resized: !svg && scale < 1 };
 }
 
 function apiError(status, body) {
@@ -129,7 +174,7 @@ function apiError(status, body) {
   if (status === 415) return { title: "Format tidak didukung", msg };
   if (status === 503) return { title: "Model belum siap", msg };
   if (status === 0) return OFFLINE;
-  return { title: "Gagal memproses", msg };
+  return { title: "Gagal memproses", msg, detail: "HTTP " + status };
 }
 
 /** Unggah dengan XHR agar progres unggah bisa ditampilkan. */
@@ -137,7 +182,7 @@ function uploadPhoto(blob, onProgress, onUploaded) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", API + "/api/jobs");
-    xhr.timeout = 60000;
+    xhr.timeout = 60000 + Math.round((blob.size / 1048576) * 10000); // + 10 dtk per MB untuk sinyal lemah
     xhr.responseType = "json";
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
     xhr.upload.onload = onUploaded;
@@ -145,7 +190,7 @@ function uploadPhoto(blob, onProgress, onUploaded) {
     xhr.onerror = () => reject(OFFLINE);
     xhr.ontimeout = () => reject({ title: "Waktu habis", msg: "Server terlalu lama merespons. Coba lagi." });
     const fd = new FormData();
-    fd.append("file", blob, blob.type === "image/jpeg" ? "foto.jpg" : blob.name || "foto");
+    fd.append("file", blob, blob.name || (blob.type === "image/jpeg" ? "foto.jpg" : "foto"));
     fd.append("source", "mobile");
     xhr.send(fd);
   });
@@ -194,6 +239,7 @@ const app = createApp({
       standalone: isStandalone(),
       installHelp: false,
       apk: null,
+      appVersion: UA_APK_VERSION, // versi APK bila berjalan di dalam APK
     };
   },
 
@@ -222,6 +268,10 @@ const app = createApp({
     },
     apkHref() {
       return this.apk ? API + this.apk.url : "";
+    },
+    // Di dalam APK: tawarkan APK yang lebih baru dari server.
+    apkUpdate() {
+      return this.isNative && !!this.apk && !!this.appVersion && newerVersion(this.apk.version, this.appVersion);
     },
     apkSize() {
       return this.apk ? String(this.apk.size_mb).replace(".", ",") + " MB" : "";
@@ -308,7 +358,7 @@ const app = createApp({
         this.photo = await preparePhoto(file);
         this.go("preview");
       } catch (err) {
-        this.error = err.title ? err : { title: "Gagal membuka foto", msg: String(err) };
+        this.error = this.withVersion(err.title ? err : { title: "Gagal membuka foto", msg: String(err) });
       } finally {
         this.preparing = false;
       }
@@ -333,7 +383,7 @@ const app = createApp({
         this.server.online = true;
         this.go("result", true); // tombol kembali dari hasil → beranda
       } catch (err) {
-        this.error = err.title ? err : { title: "Gagal memproses", msg: String(err) };
+        this.error = this.withVersion(err.title ? err : { title: "Gagal memproses", msg: String(err) });
         if (err === OFFLINE) this.markOffline();
       } finally {
         this.busy = false;
@@ -352,6 +402,7 @@ const app = createApp({
       } catch (_) { /* tidak didukung */ }
       this.isNative = !!this.native();
       this.canShare = web || this.isNative;
+      if (this.isNative && !this.appVersion) this.appVersion = "1.0"; // APK lama tanpa penanda versi
     },
 
     // ----- pasang aplikasi
@@ -360,6 +411,21 @@ const app = createApp({
         const r = await fetch(API + "/api/downloads", { cache: "no-store" });
         if (r.ok) this.apk = (await r.json()).apk;
       } catch (_) { /* menu APK cukup disembunyikan */ }
+    },
+    // Detail teknis di pesan galat (membantu melacak masalah di HP tertentu).
+    withVersion(err) {
+      if (!err.detail || !this.appVersion) return err;
+      return { ...err, detail: `${err.detail} · APK ${this.appVersion}` };
+    },
+    async openApkUpdate() {
+      const url = new URL(API + this.apk.url, location.href);
+      try {
+        await window.PichanterNative.openExternal(url.href); // APK >= 1.1: buka di browser HP
+      } catch (_) {
+        // APK 1.0 belum punya openExternal. Alamat http:// (beda skema) dibuka Capacitor di browser HP.
+        url.protocol = "http:";
+        location.href = url.href;
+      }
     },
     async installPwa() {
       if (!installEvent) {

@@ -19,5 +19,7 @@ window.PichanterNative = (function () {
     saveImage: (url, fileName) => get().saveImage({ url: abs(url), fileName }),
     /** Unduh url lalu buka dialog Bagikan Android. */
     shareImage: (url, fileName) => get().shareImage({ url: abs(url), fileName }),
+    /** Buka alamat di browser HP (mis. unduh APK baru). Hanya ada di APK >= 1.1. */
+    openExternal: (url) => (get() ? get().openExternal({ url: abs(url) }) : Promise.reject(new Error("bukan APK"))),
   };
 })();
