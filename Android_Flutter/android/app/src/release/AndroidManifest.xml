@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Pastikan build release 100% bebas izin INTERNET meskipun ada plugin yang menyisipkannya. -->
+    <uses-permission
+        android:name="android.permission.INTERNET"
+        tools:node="remove" />
+</manifest>

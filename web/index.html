@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pichanter Dashboard</title>
+  <meta name="description" content="Riwayat hapus background dari semua perangkat dan kinerja model Pichanter.">
+  <meta name="theme-color" content="#5B3FE6">
+  <link rel="icon" type="image/png" href="/app/icons/favicon-64.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app" v-cloak>
+
+  <!-- ================================================================ navigasi -->
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="#/">
+        <img src="/app/icons/icon-192.png" alt="" width="30" height="30">
+        <span>Pichanter</span>
+      </a>
+      <nav class="tabs" aria-label="Halaman">
+        <a href="#/" :class="{ active: route.name === 'history' || route.name === 'job' }">Riwayat</a>
+        <a href="#/model" :class="{ active: route.name === 'model' }">Info Model</a>
+        <a href="#/unduh" :class="{ active: route.name === 'unduh' }"><span class="long">Unduh Aplikasi</span><span class="short">Unduh</span></a>
+      </nav>
+      <div class="nav-right">
+        <span class="status" :class="status.kind"><i></i>{{ status.label }}</span>
+        <button class="btn secondary sm" @click="qrOpen = true">
+          <svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>
+          Buka di HP
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <p v-if="server.placeholder" class="banner warn">
+    <svg viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.01"/></svg>
+    <span>Server memakai <b>model sementara</b> (training belum selesai). Hasil belum mewakili model U-Net + MobileNetV3.</span>
+  </p>
+
+  <main class="page">
+
+    <!-- ================================================================ RIWAYAT -->
+    <section v-if="route.name === 'history'">
+      <div class="page-head">
+        <div>
+          <h1>Riwayat</h1>
+          <p class="sub">
+            Hasil dari semua perangkat, terbaru di atas.
+            <span class="live" :class="{ off: !historyOk }"><i></i>{{ historyOk ? 'Diperbarui otomatis' : 'Gagal memuat, mencoba lagi…' }}</span>
+          </p>
+        </div>
+        <div class="filters" role="radiogroup" aria-label="Filter sumber">
+          <button v-for="f in sourceFilters" :key="f.id" class="chip" role="radio"
+                  :class="{ active: filter === f.id }" :aria-checked="filter === f.id" @click="setFilter(f.id)">
+            {{ f.label }} <span>{{ counts[f.id] }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Unggah dari web (F10) -->
+      <label class="dropzone" :class="{ over: dragOver, busy: uploading }"
+             @dragover.prevent="dragOver = true" @dragleave="dragOver = false" @drop.prevent="onDrop">
+        <input type="file" accept="image/jpeg,image/png,image/webp" hidden @change="onPick" :disabled="uploading">
+        <svg viewBox="0 0 24 24"><path d="M12 16V5M7.5 9.5L12 5l4.5 4.5M5 19.5h14"/></svg>
+        <span v-if="!uploading"><b>Unggah dari laptop</b> atau seret foto ke sini · JPG, PNG, WEBP, maks. 10 MB</span>
+        <span v-else>{{ uploadPhase === 'upload' ? 'Mengunggah ' + uploadProgress + '%' : 'Menghapus background…' }}</span>
+        <i v-if="uploading" class="bar" :style="{ width: (uploadPhase === 'upload' ? uploadProgress : 100) + '%' }"></i>
+      </label>
+
+      <div v-if="error" class="alert" role="alert">
+        <b>{{ error.title }}</b> {{ error.msg }}
+        <button class="link" @click="error = null">Tutup</button>
+      </div>
+
+      <div v-if="jobs.length" class="grid">
+        <article v-for="j in jobs" :key="j.id" class="card" :class="{ fresh: freshIds.has(j.id) }">
+          <a class="thumb checker" :href="'#/job/' + j.id" :aria-label="'Detail ' + j.id.slice(0, 8)">
+            <img :src="j.thumb_url" :alt="'Hasil ' + j.id.slice(0, 8)" loading="lazy">
+            <span class="badge" :class="j.source">
+              <svg v-if="j.source === 'mobile'" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>
+              <svg v-else viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M8 20h8"/></svg>
+              {{ j.source === 'mobile' ? 'Mobile' : 'Web' }}
+            </span>
+          </a>
+          <div class="card-body">
+            <div class="card-meta">
+              <time :datetime="j.created_at" :title="fmtDateTime(j.created_at)">{{ fmtRelative(j.created_at) }}</time>
+              <span>{{ fmtMs(j.inference_ms) }} model</span>
+            </div>
+            <div class="card-meta muted">
+              <span>{{ j.width }}×{{ j.height }}</span>
+              <span>{{ j.model_version }}</span>
+            </div>
+            <a class="btn secondary sm full" :href="j.result_url + '?download=true'" download>
+              <svg viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>
+              Unduh ukuran asli
+            </a>
+          </div>
+        </article>
+      </div>
+
+      <div v-else-if="historyLoaded" class="empty">
+        <img src="/app/icons/icon-192.png" alt="" width="56" height="56">
+        <h2>Belum ada foto{{ filter !== 'all' ? ' dari ' + (filter === 'mobile' ? 'mobile' : 'web') : '' }}</h2>
+        <p>Proses foto dari aplikasi Pichanter di HP, hasilnya muncul di sini dalam beberapa detik. Bisa juga unggah langsung dari laptop.</p>
+        <div class="empty-actions">
+          <button class="btn primary" @click="qrOpen = true">Buka aplikasi di HP</button>
+          <a class="btn secondary" href="#/unduh">Unduh aplikasi Android</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================ DETAIL -->
+    <section v-else-if="route.name === 'job'">
+      <a class="back" href="#/">
+        <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg> Riwayat
+      </a>
+
+      <div v-if="jobError" class="empty">
+        <h2>{{ jobError }}</h2>
+        <p>Hasil disimpan di server maksimal 24 jam lalu dihapus otomatis.</p>
+      </div>
+
+      <template v-else-if="job">
+        <div class="page-head">
+          <div>
+            <h1>Detail proses <span class="mono">#{{ job.id.slice(0, 8) }}</span></h1>
+            <p class="sub">
+              <span class="badge inline" :class="job.source">{{ job.source === 'mobile' ? 'Mobile' : 'Web' }}</span>
+              {{ fmtDateTime(job.created_at) }}
+            </p>
+          </div>
+        </div>
+
+        <div class="detail">
+          <div class="panels">
+            <figure class="panel">
+              <div class="panel-img"><img :src="job.original_url" alt="Foto asli"></div>
+              <figcaption>Foto asli</figcaption>
+            </figure>
+            <figure class="panel">
+              <div class="panel-img dark"><img :src="job.mask_url" alt="Mask"></div>
+              <figcaption>Mask (probabilitas orang)</figcaption>
+            </figure>
+            <figure class="panel">
+              <div class="panel-img checker"><img :src="job.result_url" alt="Hasil transparan"></div>
+              <figcaption>Hasil, PNG transparan</figcaption>
+            </figure>
+            <figure class="panel">
+              <div class="panel-img" :style="{ background: '#' + detailBg }"><img :src="job.result_url" alt="Hasil dengan latar warna"></div>
+              <figcaption>Ganti background</figcaption>
+            </figure>
+          </div>
+
+          <aside class="side">
+            <div class="box">
+              <h3>Warna latar</h3>
+              <div class="swatches">
+                <button v-for="c in colors" :key="c.hex" class="swatch" :class="{ active: detailBg === c.hex }"
+                        :style="{ background: '#' + c.hex }" :title="c.label" :aria-label="c.label" @click="detailBg = c.hex"></button>
+                <label class="swatch custom" :class="{ active: !colors.some(c => c.hex === detailBg) }" title="Kustom">
+                  <input type="color" :value="'#' + detailBg" @input="detailBg = $event.target.value.slice(1).toUpperCase()" aria-label="Warna kustom">
+                </label>
+              </div>
+              <div class="downloads">
+                <a class="btn primary full" :href="job.result_url + '?download=true'" download>
+                  <svg viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg> PNG transparan
+                </a>
+                <a class="btn secondary full" :href="job.result_url + '?download=true&bg=' + detailBg" download>PNG latar #{{ detailBg }}</a>
+                <a class="btn secondary full" :href="job.result_url + '?download=true&format=jpg&bg=' + detailBg" download>JPG latar #{{ detailBg }}</a>
+              </div>
+            </div>
+
+            <dl class="box facts">
+              <div><dt>Ukuran</dt><dd>{{ job.width }}×{{ job.height }} px</dd></div>
+              <div><dt>Waktu model</dt><dd>{{ fmtMs(job.inference_ms) }}</dd></div>
+              <div><dt>Waktu di server</dt><dd>{{ fmtMs(job.total_ms) }}</dd></div>
+              <div><dt>Model</dt><dd class="mono">{{ job.model_version }}</dd></div>
+              <div><dt>Sumber</dt><dd>{{ job.source }}</dd></div>
+              <div><dt>Dihapus otomatis</dt><dd :title="fmtDateTime(job.expires_at)">{{ fmtRelative(job.expires_at) }}</dd></div>
+            </dl>
+          </aside>
+        </div>
+      </template>
+      <p v-else class="sub">Memuat…</p>
+    </section>
+
+    <!-- ================================================================ INFO MODEL -->
+    <section v-else-if="route.name === 'model'">
+      <div class="page-head">
+        <div>
+          <h1>Info Model</h1>
+          <p class="sub">
+            U-Net dengan encoder MobileNetV3-Large · versi <span class="mono">{{ model ? model.model_version : '…' }}</span>
+            <template v-if="model && model.model_size_mb"> · {{ fmtNum(model.model_size_mb, 1) }} MB</template>
+          </p>
+        </div>
+      </div>
+
+      <template v-if="model">
+        <!-- Metrik utama -->
+        <template v-if="ev">
+          <h2 class="section">Kinerja pada data test <span>{{ ev.jumlah_data ? fmtInt(ev.jumlah_data.test) + ' gambar' : '' }}</span></h2>
+          <div class="tiles">
+            <div v-for="k in kpis" :key="k.key" class="tile">
+              <span class="tile-label">{{ k.label }}</span>
+              <span class="tile-value">{{ k.value == null ? '–' : fmtNum(k.value, 4) }}</span>
+              <span class="tile-status" :class="k.pass ? 'good' : 'bad'" v-if="k.value != null">
+                <svg v-if="k.pass" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                <svg v-else viewBox="0 0 24 24"><path d="M12 7v6M12 16.5v.01"/></svg>
+                {{ k.pass ? 'Memenuhi target' : 'Di bawah target' }} {{ k.targetText }}
+              </span>
+              <span class="tile-ref">{{ k.paper ? 'Paper: ' + fmtNum(k.paper, 4) : 'Paper: tidak dilaporkan' }}</span>
+            </div>
+          </div>
+          <div class="tiles small">
+            <div v-for="m in secondaryMetrics" :key="m.key" class="tile">
+              <span class="tile-label">{{ m.label }}</span>
+              <span class="tile-value">{{ m.value == null ? '–' : fmtNum(m.value, 4) }}</span>
+            </div>
+          </div>
+        </template>
+        <div v-else class="empty slim">
+          <h2>Hasil evaluasi belum tersedia</h2>
+          <p>Salin <span class="mono">hasil_evaluasi.json</span> dan <span class="mono">fig_*.png</span> dari folder
+            <span class="mono">pichanter_bgremoval/</span> ke <span class="mono">backend/models/</span>, lalu muat ulang halaman ini.</p>
+        </div>
+
+        <div class="cols">
+          <div class="box">
+            <h3>Model &amp; training</h3>
+            <dl class="facts">
+              <div v-if="ev && ev.parameter"><dt>Parameter</dt><dd>{{ fmtCompact(ev.parameter.total) }}
+                <small>encoder {{ fmtCompact(ev.parameter.encoder) }} · decoder {{ fmtCompact(ev.parameter.decoder) }}</small></dd></div>
+              <div v-if="ev && ev.training"><dt>Epoch terbaik</dt><dd>{{ ev.training.epoch_terbaik }} dari {{ ev.training.epoch_dijalankan }}
+                <small>{{ fmtNum(ev.training.menit, 1) }} menit</small></dd></div>
+              <div v-if="ev && ev.jumlah_data"><dt>Data</dt><dd>{{ fmtInt(ev.jumlah_data.total) }} gambar
+                <small>train {{ fmtInt(ev.jumlah_data.train) }} · val {{ fmtInt(ev.jumlah_data.val) }} · test {{ fmtInt(ev.jumlah_data.test) }}</small></dd></div>
+              <div v-if="ev && ev.config"><dt>Loss · optimizer</dt><dd>{{ ev.config.LOSS }} · Adam {{ ev.config.LR }}
+                <small>batch {{ ev.config.BATCH }} · input {{ ev.config.IMG_SIZE }}×{{ ev.config.IMG_SIZE }}</small></dd></div>
+              <div v-if="ev && ev.deploy"><dt>Threshold</dt><dd>{{ fmtNum(ev.deploy.threshold, 2) }}</dd></div>
+              <div><dt>File model</dt><dd class="mono">{{ model.model_file || 'belum dipasang' }}</dd></div>
+              <div v-if="ev && ev.paper_acuan"><dt>Acuan</dt><dd><small>{{ ev.paper_acuan }}</small></dd></div>
+            </dl>
+          </div>
+          <div class="box">
+            <h3>Di server ini</h3>
+            <div class="tiles inner">
+              <div class="tile">
+                <span class="tile-label">Foto diproses</span>
+                <span class="tile-value">{{ fmtInt(model.server_stats.jobs) }}</span>
+                <span class="tile-ref">mobile {{ fmtInt(model.server_stats.by_source.mobile || 0) }} · web {{ fmtInt(model.server_stats.by_source.web || 0) }}</span>
+              </div>
+              <div class="tile">
+                <span class="tile-label">Rata-rata waktu model</span>
+                <span class="tile-value">{{ fmtMs(model.server_stats.avg_inference_ms) }}</span>
+                <span class="tile-ref">inferensi TFLite di CPU</span>
+              </div>
+              <div class="tile">
+                <span class="tile-label">Rata-rata waktu server</span>
+                <span class="tile-value">{{ fmtMs(model.server_stats.avg_total_ms) }}</span>
+                <span class="tile-status" :class="model.server_stats.avg_total_ms == null || model.server_stats.avg_total_ms <= 2000 ? 'good' : 'bad'">
+                  target ≤ 2 dtk
+                </span>
+              </div>
+            </div>
+            <p class="note">Foto yang lebih lama dari 24 jam sudah terhapus, jadi angka ini hanya mencakup 24 jam terakhir.</p>
+          </div>
+        </div>
+
+        <!-- Uji ketahanan -->
+        <template v-if="ev && ev.uji_ketahanan && ev.uji_ketahanan.length">
+          <h2 class="section">Uji ketahanan <span>mean Dice saat gambar test diberi gangguan</span></h2>
+          <div class="box flush">
+            <table class="table">
+              <thead><tr><th>Kondisi</th><th class="barcol">Dice (skala 0–1)</th><th class="num">Dice</th><th class="num">IoU</th><th class="num">MAD</th><th class="num">Penurunan Dice</th></tr></thead>
+              <tbody>
+                <tr v-for="r in ev.uji_ketahanan" :key="r.kondisi">
+                  <td>{{ r.kondisi }}</td>
+                  <td class="barcol"><span class="hbar" :title="r.kondisi + ': Dice ' + fmtNum(r.dice, 4)"><i :style="{ width: (Math.max(0, Math.min(1, r.dice)) * 100) + '%' }"></i></span></td>
+                  <td class="num">{{ fmtNum(r.dice, 4) }}</td>
+                  <td class="num">{{ fmtNum(r.iou, 4) }}</td>
+                  <td class="num">{{ fmtNum(r.mad, 4) }}</td>
+                  <td class="num" :class="{ worst: r === worstRobust }">{{ r.penurunan_dice > 0 ? '−' + fmtNum(r.penurunan_dice, 4) : '–' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+
+        <!-- Format ekspor -->
+        <template v-if="ev && ev.format_ekspor && ev.format_ekspor.length">
+          <h2 class="section">Format ekspor <span>ukuran, akurasi, dan latensi tiap format</span></h2>
+          <div class="box flush">
+            <table class="table">
+              <thead><tr><th>Format</th><th class="num">Ukuran</th><th class="num">Dice</th><th class="num">Latensi</th></tr></thead>
+              <tbody>
+                <tr v-for="r in ev.format_ekspor" :key="r.format">
+                  <td>{{ r.format }}</td>
+                  <td class="num">{{ fmtNum(r.ukuran_MB, 2) }} MB</td>
+                  <td class="num">{{ fmtNum(r.dice, 4) }}</td>
+                  <td class="num">{{ fmtNum(r.latensi_ms, 1) }} ms</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+
+        <!-- Grafik notebook -->
+        <template v-if="model.figures.length">
+          <h2 class="section">Grafik dari notebook <span>{{ model.figures.length }} gambar</span></h2>
+          <div class="figs">
+            <button v-for="f in model.figures" :key="f.name" class="fig" @click="lightbox = f">
+              <img :src="f.url" :alt="figTitle(f.name)" loading="lazy">
+              <span>{{ figTitle(f.name) }}</span>
+            </button>
+          </div>
+        </template>
+      </template>
+      <p v-else-if="modelError" class="alert"><b>Gagal memuat info model.</b> {{ modelError }}</p>
+      <p v-else class="sub">Memuat…</p>
+    </section>
+
+    <!-- ================================================================ UNDUH APLIKASI -->
+    <section v-else-if="route.name === 'unduh'">
+      <div class="page-head">
+        <div>
+          <h1>Unduh Aplikasi</h1>
+          <p class="sub">Pakai Pichanter di HP sebagai aplikasi Android (APK) atau aplikasi web yang dipasang di layar utama (PWA). Keduanya memakai server dan riwayat yang sama.</p>
+        </div>
+      </div>
+
+      <div class="dl-grid">
+        <!-- APK Android -->
+        <article class="box dl-card">
+          <header class="dl-head">
+            <span class="dl-icon android">
+              <svg viewBox="0 0 24 24"><path d="M5 10.5a7 7 0 0 1 14 0V17a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><path d="M7.5 4.5L9 6.8M16.5 4.5L15 6.8"/><path d="M9.5 10.5v.01M14.5 10.5v.01"/></svg>
+            </span>
+            <div>
+              <h2>Aplikasi Android</h2>
+              <p>APK untuk Android 10 ke atas. Hasil langsung tersimpan di Galeri.</p>
+            </div>
+          </header>
+
+          <template v-if="downloads && downloads.apk">
+            <div class="dl-body">
+              <div class="dl-qr">
+                <div class="qr" v-html="qrFor(apkAbsUrl, 4)"></div>
+                <span>Pindai untuk mengunduh di HP</span>
+              </div>
+              <div class="dl-main">
+                <a class="btn primary full" :href="downloads.apk.url" download>
+                  <svg viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>
+                  Unduh APK · {{ fmtNum(downloads.apk.size_mb, 1) }} MB
+                </a>
+                <dl class="facts">
+                  <div v-if="downloads.apk.version"><dt>Versi</dt><dd>{{ downloads.apk.version }}</dd></div>
+                  <div><dt>Diperbarui</dt><dd :title="fmtDateTime(downloads.apk.built_at)">{{ fmtDate(downloads.apk.built_at) }}</dd></div>
+                  <div><dt>Perangkat</dt><dd>Android {{ downloads.apk.min_android }}+</dd></div>
+                </dl>
+              </div>
+            </div>
+            <h3>Cara memasang</h3>
+            <ol class="steps">
+              <li>Unduh <b>pichanter.apk</b> di HP, lalu buka file-nya dari notifikasi atau folder <i>Download</i>.</li>
+              <li>Bila diminta, izinkan <b>Instal aplikasi tidak dikenal</b> untuk browser atau aplikasi File.</li>
+              <li>Ketuk <b>Instal</b>. Bila Play Protect memberi peringatan, pilih <b>Tetap instal</b> (aplikasi belum ada di Play Store).</li>
+            </ol>
+            <details v-if="downloads.apk.sha256" class="hash">
+              <summary>Checksum SHA-256</summary>
+              <code class="mono">{{ downloads.apk.sha256 }}</code>
+            </details>
+          </template>
+          <div v-else-if="downloads" class="empty slim">
+            <h2>APK belum diterbitkan</h2>
+            <p>Jalankan <span class="mono">npm run apk</span> di folder <span class="mono">android-app/</span>, lalu deploy ulang. Sementara itu, pakai aplikasi web di sebelah.</p>
+          </div>
+          <p v-else-if="downloadsError" class="alert">Gagal memuat info unduhan. {{ downloadsError }}</p>
+          <p v-else class="sub">Memuat…</p>
+        </article>
+
+        <!-- PWA -->
+        <article class="box dl-card">
+          <header class="dl-head">
+            <span class="dl-icon pwa">
+              <svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/><path d="M12 7.5v5M9.8 10.5l2.2 2.2 2.2-2.2"/></svg>
+            </span>
+            <div>
+              <h2>Aplikasi Web (PWA)</h2>
+              <p>Tanpa unduhan dari luar Play Store. Bisa di Android, iPhone, dan laptop.</p>
+            </div>
+          </header>
+
+          <div class="dl-body">
+            <div class="dl-qr">
+              <div class="qr" v-html="qrFor(mobileUrl, 4)"></div>
+              <span>Pindai untuk membuka di HP</span>
+            </div>
+            <div class="dl-main">
+              <a class="btn primary full" href="/app/" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+                Buka aplikasi web
+              </a>
+              <p class="mono url">{{ mobileUrl }}</p>
+            </div>
+          </div>
+
+          <h3>Cara memasang</h3>
+          <div class="seg" role="tablist" aria-label="Perangkat">
+            <button v-for="t in pwaTabs" :key="t.id" role="tab" :aria-selected="pwaTab === t.id"
+                    :class="{ active: pwaTab === t.id }" @click="pwaTab = t.id">{{ t.label }}</button>
+          </div>
+          <ol v-if="pwaTab === 'android'" class="steps">
+            <li>Buka alamat di atas dengan <b>Chrome</b>.</li>
+            <li>Ketuk tombol <b>Pasang aplikasi</b> di beranda Pichanter, atau menu <b>⋮</b> lalu <b>Instal aplikasi</b> / <b>Tambahkan ke layar utama</b>.</li>
+            <li>Ikon Pichanter muncul di layar utama dan terbuka layar penuh seperti aplikasi biasa.</li>
+          </ol>
+          <ol v-else-if="pwaTab === 'ios'" class="steps">
+            <li>Buka alamat di atas dengan <b>Safari</b>.</li>
+            <li>Ketuk tombol <b>Bagikan</b> <span class="ios-share" aria-hidden="true">⬆︎</span>, gulir, lalu pilih <b>Tambahkan ke Layar Utama</b>.</li>
+            <li>Ketuk <b>Tambah</b>. Ikon Pichanter muncul di layar utama.</li>
+          </ol>
+          <ol v-else class="steps">
+            <li>Buka <b>Buka aplikasi web</b> di Chrome atau Edge.</li>
+            <li>Klik ikon <b>Instal</b> di ujung kanan kolom alamat, atau tombol <b>Pasang aplikasi</b> di beranda Pichanter.</li>
+            <li>Pichanter terbuka di jendela sendiri dan muncul di menu Start.</li>
+          </ol>
+        </article>
+      </div>
+
+      <h2 class="section">Pilih yang mana? <span>dua-duanya memakai model dan server yang sama</span></h2>
+      <div class="box flush">
+        <table class="table compare">
+          <thead><tr><th></th><th>Aplikasi Android (APK)</th><th>Aplikasi Web (PWA)</th></tr></thead>
+          <tbody>
+            <tr><td>Perangkat</td><td>Android 10+</td><td>Android, iPhone, laptop</td></tr>
+            <tr><td>Simpan hasil</td><td>Langsung ke Galeri (Pictures/<wbr>Pichanter)</td><td>Ke folder Unduhan</td></tr>
+            <tr><td>Bagikan ke WhatsApp dll.</td><td>Menu bagikan Android</td><td>Bila browser mendukung</td></tr>
+            <tr><td>Ukuran</td><td>{{ downloads && downloads.apk ? fmtNum(downloads.apk.size_mb, 1) + ' MB' : '±10 MB' }}</td><td>&lt; 1 MB</td></tr>
+            <tr><td>Pembaruan</td><td>Tampilan otomatis dari server</td><td>Otomatis</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================================================================ dialog -->
+  <div v-if="qrOpen" class="overlay" @click.self="qrOpen = false" @keydown.esc="qrOpen = false">
+    <div class="dialog" role="dialog" aria-modal="true" aria-label="Buka aplikasi di HP">
+      <h3>Buka Pichanter di HP</h3>
+      <p>Pindai dengan kamera HP. Foto yang diproses di HP akan muncul di Riwayat.</p>
+      <div class="qr" v-html="qrSvg"></div>
+      <p class="mono url">{{ mobileUrl }}</p>
+      <button class="btn secondary full" @click="qrOpen = false">Tutup</button>
+    </div>
+  </div>
+
+  <div v-if="lightbox" class="overlay" @click="lightbox = null">
+    <figure class="lightbox">
+      <img :src="lightbox.url" :alt="figTitle(lightbox.name)">
+      <figcaption>{{ figTitle(lightbox.name) }} · klik di mana saja untuk menutup</figcaption>
+    </figure>
+  </div>
+</div>
+
+<script src="/app/vendor/vue.global.prod.js"></script>
+<script src="vendor/qrcode.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+{
+  "model_version": "unet-mnv3l-384-fp16-v2",
+  "accelerator": "CPU (4 thread)",
+  "build_mode": "profile",
+  "count": 5,
+  "summary": {
+    "avg_preprocess_ms": 395.6,
+    "avg_inference_ms": 270.7,
+    "avg_postprocess_ms": 176.3,
+    "avg_total_pipeline_ms": 856.6
+  },
+  "items": [
+    {
+      "file": "01_office_12mp.jpg",
+      "width": 4032,
+      "height": 3024,
+      "preprocess_ms": 1332.68,
+      "inference_ms": 366.21,
+      "postprocess_ms": 511.85,
+      "total_pipeline_ms": 2234.51
+    },
+    {
+      "file": "02_group_portrait.png",
+      "width": 1447,
+      "height": 1087,
+      "preprocess_ms": 134.28,
+      "inference_ms": 197.71,
+      "postprocess_ms": 79.75,
+      "total_pipeline_ms": 424.51
+    },
+    {
+      "file": "03_infografis.jpg",
+      "width": 2400,
+      "height": 1792,
+      "preprocess_ms": 298.7,
+      "inference_ms": 229.02,
+      "postprocess_ms": 169.28,
+      "total_pipeline_ms": 708.16
+    },
+    {
+      "file": "04_exif_orient6.jpg",
+      "width": 900,
+      "height": 1200,
+      "preprocess_ms": 105.71,
+      "inference_ms": 343.72,
+      "postprocess_ms": 60.25,
+      "total_pipeline_ms": 519.48
+    },
+    {
+      "file": "05_exif_orient8.jpg",
+      "width": 900,
+      "height": 1200,
+      "preprocess_ms": 106.75,
+      "inference_ms": 216.95,
+      "postprocess_ms": 60.17,
+      "total_pipeline_ms": 396.33
+    }
+  ]
+}

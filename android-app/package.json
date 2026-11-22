@@ -1,0 +1,14 @@
+{
+  "name": "pichanter-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "APK Pichanter: membungkus PWA (/app/) dengan Capacitor",
+  "scripts": {
+    "apk": "node build.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/cli": "^8.6.2",
+    "@capacitor/core": "^8.6.2"
+  }
+}

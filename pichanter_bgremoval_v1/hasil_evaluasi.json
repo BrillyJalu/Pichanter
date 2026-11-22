@@ -1,0 +1,176 @@
+{
+  "run": "v1",
+  "paper_acuan": "Shahi & Li (2023), IJNDI 2(2):100004, doi:10.53941/ijndi.2023.100004",
+  "dataset": "Kaggle nikhilroxtomar/person-segmentation",
+  "jumlah_data": {
+    "total": 5678,
+    "train": 4542,
+    "val": 567,
+    "test": 569
+  },
+  "config": {
+    "IMG_SIZE": 256,
+    "BACKBONE": "mobilenetv3large",
+    "ALPHA": 1.0,
+    "WEIGHTS": "imagenet",
+    "DECODER_FILTERS": [
+      128,
+      64,
+      48,
+      32
+    ],
+    "BN_MOMENTUM": 0.9,
+    "LOSS": "bce_dice",
+    "BATCH": 8,
+    "EPOCHS": 100,
+    "LR": 0.0001,
+    "MIN_LR": 1e-07,
+    "PATIENCE_LR": 5,
+    "PATIENCE_ES": 10,
+    "SPLIT": [
+      0.8,
+      0.1,
+      0.1
+    ],
+    "THRESHOLD": 0.5,
+    "MIXED_PRECISION": false,
+    "SEED": 42,
+    "MAX_IMAGES": null,
+    "RUN_NAME": "v1",
+    "OUT_DIR": "/content/pichanter_bgremoval_v1",
+    "DRIVE_DIR": "/content/drive/MyDrive/UTS_Pembelajaran_Mesin/pichanter_bgremoval_v1",
+    "BASELINE_DIR": "/content/drive/MyDrive/UTS_Pembelajaran_Mesin/pichanter_bgremoval"
+  },
+  "skip_layers": [
+    "re_lu_1",
+    "re_lu_5",
+    "activation_1",
+    "activation_13"
+  ],
+  "parameter": {
+    "total": 3543417,
+    "encoder": 2996352,
+    "decoder": 547065
+  },
+  "training": {
+    "epoch_dijalankan": 34,
+    "epoch_terbaik": 24,
+    "menit": 23.3
+  },
+  "test_mean": {
+    "dice": 0.9136999845504761,
+    "iou": 0.8565000295639038,
+    "precision": 0.9223999977111816,
+    "recall": 0.9182000160217285,
+    "pixel_acc": 0.9735000133514404,
+    "soft_dice": 0.8996000289916992,
+    "mad": 0.030700000002980232,
+    "mse": 0.0215000007301569
+  },
+  "test_std": {
+    "dice": 0.1128000020980835,
+    "iou": 0.15150000154972076,
+    "precision": 0.11060000211000443,
+    "recall": 0.13109999895095825,
+    "pixel_acc": 0.04100000113248825,
+    "soft_dice": 0.1137000024318695,
+    "mad": 0.04190000146627426,
+    "mse": 0.03579999879002571
+  },
+  "test_agregat": {
+    "dice_global": 0.9457,
+    "iou_global": 0.8969,
+    "mad_global": 0.0307,
+    "mse_global": 0.0215
+  },
+  "uji_ketahanan": [
+    {
+      "kondisi": "asli",
+      "dice": 0.9200000166893005,
+      "iou": 0.8639000058174133,
+      "mad": 0.026000000536441803,
+      "penurunan_dice": 0.0
+    },
+    {
+      "kondisi": "gelap (\u00d70,35)",
+      "dice": 0.9151999950408936,
+      "iou": 0.85589998960495,
+      "mad": 0.02879999950528145,
+      "penurunan_dice": 0.004800000227987766
+    },
+    {
+      "kondisi": "overexposed",
+      "dice": 0.8730999827384949,
+      "iou": 0.7957000136375427,
+      "mad": 0.045499999076128006,
+      "penurunan_dice": 0.04690000042319298
+    },
+    {
+      "kondisi": "noise \u03c3=20",
+      "dice": 0.8748999834060669,
+      "iou": 0.7985000014305115,
+      "mad": 0.04569999873638153,
+      "penurunan_dice": 0.045099999755620956
+    },
+    {
+      "kondisi": "blur r=3",
+      "dice": 0.7804999947547913,
+      "iou": 0.6845999956130981,
+      "mad": 0.07609999924898148,
+      "penurunan_dice": 0.13950000703334808
+    },
+    {
+      "kondisi": "JPEG q=15",
+      "dice": 0.8600999712944031,
+      "iou": 0.781000018119812,
+      "mad": 0.04610000178217888,
+      "penurunan_dice": 0.05990000069141388
+    },
+    {
+      "kondisi": "grayscale",
+      "dice": 0.9041000008583069,
+      "iou": 0.8407999873161316,
+      "mad": 0.030899999663233757,
+      "penurunan_dice": 0.01590000092983246
+    }
+  ],
+  "format_ekspor": [
+    {
+      "format": "Keras fp32 (GPU)",
+      "ukuran_MB": 15.1447,
+      "dice": 0.9172999858856201,
+      "latensi_ms": 7.7516
+    },
+    {
+      "format": "TFLite fp32 (CPU 4 thread)",
+      "ukuran_MB": 14.0902,
+      "dice": 0.9172999858856201,
+      "latensi_ms": 9.1042
+    },
+    {
+      "format": "TFLite fp16 (CPU 4 thread)",
+      "ukuran_MB": 7.1488,
+      "dice": 0.9172000288963318,
+      "latensi_ms": 9.1009
+    },
+    {
+      "format": "TFLite int8dyn (CPU 4 thread)",
+      "ukuran_MB": 3.9248,
+      "dice": 0.913100004196167,
+      "latensi_ms": 19.7201
+    }
+  ],
+  "deploy": {
+    "input": "RGB float32 0-255, shape [1,256,256,3], tanpa normalisasi",
+    "output": "probabilitas orang float32 0-1, shape [1,256,256,1]",
+    "threshold": 0.5
+  },
+  "perbandingan_v0": {
+    "dice_rata2_v0": 0.9113,
+    "dice_rata2_v1": 0.9137,
+    "lebih_baik": 225,
+    "lebih_buruk": 240,
+    "wilcoxon_p": 0.5125090027110251,
+    "kesimpulan": "setara"
+  }
+}

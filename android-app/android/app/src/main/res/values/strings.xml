@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Pichanter</string>
+    <string name="title_activity_main">Pichanter</string>
+    <string name="package_name">id.my.jalulabs.pichanter</string>
+    <string name="custom_url_scheme">id.my.jalulabs.pichanter</string>
+</resources>

@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pichanter</title>
+  <meta name="description" content="Hapus dan ganti background foto orang langsung dari HP.">
+  <meta name="theme-color" content="#5B3FE6">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/favicon-64.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app" class="app" v-cloak>
+
+  <!-- ===== Header ===== -->
+  <header class="topbar">
+    <button v-if="screen !== 'home'" class="icon-btn" @click="goHome" aria-label="Kembali">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="brand">
+      <img src="icons/icon-192.png" alt="" width="32" height="32">
+      <span>Pichanter</span>
+    </div>
+    <button class="status" :class="status.kind" @click="checkHealth" :aria-label="'Status server: ' + status.label">
+      <i></i>{{ status.label }}
+    </button>
+  </header>
+
+  <!-- Peringatan model sementara (hilang otomatis setelah model asli dipasang) -->
+  <p v-if="server.placeholder" class="note warn">
+    Server memakai <b>model sementara</b> karena training belum selesai. Hasil belum mewakili model AI.
+  </p>
+
+  <!-- Galat -->
+  <div v-if="error" class="alert" role="alert">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg>
+    <div>
+      <b>{{ error.title }}</b>
+      <p>{{ error.msg }}</p>
+    </div>
+    <button class="icon-btn small" @click="error = null" aria-label="Tutup">
+      <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+
+  <main>
+    <!-- ===== Beranda ===== -->
+    <section v-if="screen === 'home'" class="screen home">
+      <div class="demo" aria-hidden="true">
+        <div class="demo-checker"></div>
+        <div class="demo-scene"></div>
+        <div class="demo-person"></div>
+        <div class="demo-divider"><span></span></div>
+      </div>
+
+      <h1>Hapus background foto<br>dalam hitungan detik</h1>
+      <p class="lead">Untuk pas foto, foto profil, dan katalog. Simpan sebagai PNG transparan atau ganti latar merah, biru, atau putih.</p>
+
+      <div class="actions">
+        <button class="btn primary big" @click="$refs.camera.click()" :disabled="preparing">
+          <svg viewBox="0 0 24 24"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="13" r="3.5"/></svg>
+          Ambil Foto
+        </button>
+        <button class="btn secondary big" @click="$refs.gallery.click()" :disabled="preparing">
+          <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9.5" r="1.5"/><path d="M20 15l-4.5-4.5L6 20"/></svg>
+          Pilih dari Galeri
+        </button>
+      </div>
+      <p v-if="preparing" class="hint center">Menyiapkan foto…</p>
+
+      <input ref="camera" type="file" accept="image/*" capture="environment" hidden @change="onFile">
+      <input ref="gallery" type="file" accept="image/jpeg,image/png,image/webp" hidden @change="onFile">
+
+      <p class="fineprint">
+        JPG, PNG, atau WEBP, maks. 10 MB. Foto diproses di server Pichanter, tidak dikirim ke pihak ketiga,
+        dan dihapus otomatis setelah 24 jam.
+      </p>
+
+      <!-- Pasang aplikasi: disembunyikan di dalam APK -->
+      <div v-if="showInstall || showApk" class="install">
+        <p class="install-title">Pasang Pichanter</p>
+        <button v-if="showInstall" class="install-item" @click="installPwa">
+          <span class="install-icon pwa">
+            <svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/><path d="M12 7.5v5M9.8 10.5l2.2 2.2 2.2-2.2"/></svg>
+          </span>
+          <span class="install-text"><b>Pasang di layar utama</b><small>Aplikasi web, tanpa unduhan</small></span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <a v-if="showApk" class="install-item" :href="apkHref" download>
+          <span class="install-icon android">
+            <svg viewBox="0 0 24 24"><path d="M5 10.5a7 7 0 0 1 14 0V17a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><path d="M7.5 4.5L9 6.8M16.5 4.5L15 6.8"/><path d="M9.5 10.5v.01M14.5 10.5v.01"/></svg>
+          </span>
+          <span class="install-text"><b>Unduh APK Android</b><small>{{ apkSize }} · hasil langsung masuk Galeri</small></span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>
+        </a>
+      </div>
+    </section>
+
+    <!-- ===== Pratinjau & proses ===== -->
+    <section v-else-if="screen === 'preview' && photo" class="screen">
+      <div class="stage">
+        <img :src="photo.url" alt="Foto yang dipilih" :class="{ dim: busy }">
+        <div v-if="busy" class="processing">
+          <div class="scanline"></div>
+          <div class="processing-label">
+            <span class="spinner"></span>
+            <span v-if="phase === 'upload'">Mengunggah {{ progress }}%</span>
+            <span v-else>Menghapus background…</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="meta">
+        {{ photo.width }}×{{ photo.height }} px · {{ formatBytes(photo.blob.size) }}
+        <template v-if="photo.resized"> · diperkecil dari {{ photo.origWidth }}×{{ photo.origHeight }}</template>
+      </p>
+
+      <div class="actions">
+        <button class="btn primary big" @click="process" :disabled="busy">
+          <svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>
+          {{ busy ? 'Memproses…' : 'Hapus Background' }}
+        </button>
+        <button class="btn ghost" @click="goHome" :disabled="busy">Ganti foto</button>
+      </div>
+    </section>
+
+    <!-- ===== Hasil ===== -->
+    <section v-else-if="screen === 'result' && job" class="screen">
+      <div class="stage result" :class="{ checker: !bg }" :style="bg ? { background: '#' + bg } : null"
+           @pointerdown="comparing = true" @pointerup="comparing = false"
+           @pointerleave="comparing = false" @pointercancel="comparing = false" @contextmenu.prevent>
+        <img :src="comparing ? photo.url : resultSrc" :alt="comparing ? 'Foto asli' : 'Hasil hapus background'" draggable="false">
+        <span class="stage-tag">{{ comparing ? 'Asli' : 'Tahan untuk lihat asli' }}</span>
+      </div>
+
+      <div class="swatches" role="radiogroup" aria-label="Warna latar">
+        <button v-for="c in colors" :key="c.id" class="swatch" role="radio"
+                :class="[c.id, { active: bg === c.hex }]" :aria-checked="bg === c.hex"
+                @click="bg = c.hex">
+          <i :style="c.hex ? { background: '#' + c.hex } : null"></i>
+          <span>{{ c.label }}</span>
+        </button>
+        <label class="swatch" :class="{ active: isCustom }">
+          <i class="custom-dot" :style="{ background: customColor }"></i>
+          <span>Kustom</span>
+          <input type="color" v-model="customColor" @input="bg = customColor.slice(1).toUpperCase()" aria-label="Warna kustom">
+        </label>
+      </div>
+
+      <div class="stats">
+        <div><b>{{ formatMs(job.inference_ms) }}</b><span>model AI</span></div>
+        <div><b>{{ formatMs(job.total_ms) }}</b><span>di server</span></div>
+        <div><b>{{ formatMs(clientMs) }}</b><span>total</span></div>
+        <div><b>{{ job.width }}×{{ job.height }}</b><span>piksel</span></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary big" @click="download" :disabled="saving">
+          <svg viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>
+          {{ saving ? 'Menyimpan…' : 'Unduh PNG' }}
+        </button>
+        <div class="row">
+          <button v-if="canShare" class="btn secondary" @click="share" :disabled="saving">
+            <svg viewBox="0 0 24 24"><circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1"/></svg>
+            Bagikan
+          </button>
+          <button class="btn secondary" @click="goHome">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            Foto lain
+          </button>
+        </div>
+      </div>
+      <p class="fineprint center">Model {{ job.model_version }} · tersedia di dashboard web selama 24 jam</p>
+    </section>
+  </main>
+
+  <!-- Petunjuk pasang manual (iPhone / browser tanpa tombol instal otomatis) -->
+  <div v-if="installHelp" class="sheet-overlay" @click.self="installHelp = false">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="install-help-title">
+      <h2 id="install-help-title">Pasang di layar utama</h2>
+      <ol v-if="isIOS" class="steps">
+        <li>Ketuk tombol <b>Bagikan</b> di bilah Safari (kotak dengan panah ke atas).</li>
+        <li>Gulir, lalu pilih <b>Tambahkan ke Layar Utama</b>.</li>
+        <li>Ketuk <b>Tambah</b>. Pichanter muncul sebagai ikon di layar utama.</li>
+      </ol>
+      <ol v-else class="steps">
+        <li>Buka halaman ini di <b>Chrome</b>.</li>
+        <li>Ketuk menu <b>⋮</b> di kanan atas.</li>
+        <li>Pilih <b>Instal aplikasi</b> atau <b>Tambahkan ke layar utama</b>.</li>
+      </ol>
+      <button class="btn secondary" @click="installHelp = false">Mengerti</button>
+    </div>
+  </div>
+
+  <transition name="toast"><div v-if="toast" class="toast" role="status">{{ toast }}</div></transition>
+</div>
+
+<script src="vendor/vue.global.prod.js"></script>
+<script src="config.js"></script>
+<script src="native.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

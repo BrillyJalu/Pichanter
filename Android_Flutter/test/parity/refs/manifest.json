@@ -1,0 +1,53 @@
+{
+  "model": "pichanter_bg_fp16.tflite",
+  "input_size": 384,
+  "feather": 1.5,
+  "threshold": 0.5,
+  "items": [
+    {
+      "file": "01_office_12mp.jpg",
+      "stem": "01_office_12mp",
+      "width": 4032,
+      "height": 3024,
+      "fg_pct": 12.82,
+      "python_infer_ms": 28.46,
+      "python_total_ms": 397.66
+    },
+    {
+      "file": "02_group_portrait.png",
+      "stem": "02_group_portrait",
+      "width": 1447,
+      "height": 1087,
+      "fg_pct": 36.3,
+      "python_infer_ms": 26.42,
+      "python_total_ms": 113.25
+    },
+    {
+      "file": "03_infografis.jpg",
+      "stem": "03_infografis",
+      "width": 2400,
+      "height": 1792,
+      "fg_pct": 16.41,
+      "python_infer_ms": 33.01,
+      "python_total_ms": 184.71
+    },
+    {
+      "file": "04_exif_orient6.jpg",
+      "stem": "04_exif_orient6",
+      "width": 900,
+      "height": 1200,
+      "fg_pct": 17.19,
+      "python_infer_ms": 26.82,
+      "python_total_ms": 76.02
+    },
+    {
+      "file": "05_exif_orient8.jpg",
+      "stem": "05_exif_orient8",
+      "width": 900,
+      "height": 1200,
+      "fg_pct": 13.49,
+      "python_infer_ms": 27.6,
+      "python_total_ms": 68.14
+    }
+  ]
+}

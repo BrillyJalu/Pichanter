@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pichanter — offline</title>
+  <style>
+    :root { --bg: #f6f5fb; --text: #1b1830; --muted: #6b6785; --primary: #5b3fe6; --on: #fff; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #110f1b; --text: #f2f0fa; --muted: #a5a1bf; --primary: #8b73ff; --on: #12101c; } }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, Roboto, sans-serif; }
+    main { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; box-sizing: border-box; }
+    .logo { width: 72px; height: 72px; border-radius: 20px; background: linear-gradient(#7c5cff, #432dc4); display: grid; place-items: center; }
+    .logo svg { width: 40px; height: 40px; fill: #fff; }
+    h1 { margin: 12px 0 0; font-size: 22px; }
+    p { margin: 0; max-width: 320px; color: var(--muted); line-height: 1.5; }
+    button:disabled { opacity: .6; }
+    button { margin-top: 12px; min-height: 52px; padding: 0 28px; border: 0; border-radius: 14px; background: var(--primary); color: var(--on); font: inherit; font-weight: 650; font-size: 16px; }
+    small { color: var(--muted); word-break: break-all; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="logo"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0z"/></svg></div>
+  <h1>Server tidak terjangkau</h1>
+  <p>Pichanter butuh koneksi ke server untuk menghapus background. Periksa internet lalu coba lagi.</p>
+  <button id="retry">Coba lagi</button>
+  <small id="msg">__START_URL__</small>
+</main>
+<script>
+  // Cek server dulu (maks. 8 dtk) agar layar tidak menggantung bila server menerima koneksi tapi tidak menjawab.
+  const START = "__START_URL__";
+  const btn = document.getElementById("retry");
+  const msg = document.getElementById("msg");
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "Menghubungkan…";
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      await fetch(new URL("/api/health", START).href, { mode: "no-cors", cache: "no-store", signal: ctrl.signal });
+      location.replace(START);
+    } catch (_) {
+      msg.textContent = "Masih belum terhubung. Coba lagi sebentar lagi.";
+      btn.disabled = false;
+      btn.textContent = "Coba lagi";
+    } finally {
+      clearTimeout(t);
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+# Kredensial — jangan pernah di-commit
+.env
+*.env
+!.env.example
+kaggle.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Data runtime backend
+backend/storage/
+
+# Output training besar: simpan metrik & grafik saja; model produksi di-commit lewat backend/models/
+pichanter_bgremoval*/*.keras
+pichanter_bgremoval*/*.onnx
+pichanter_bgremoval*/*.tflite
+pichanter_bgremoval*/saved_model/
+*.npy
+
+# Foto pribadi untuk uji (privasi, repo publik)
+pichanter_bgremoval*/uji_foto_sendiri/
+
+# Android / Node (tahap APK)
+node_modules/
+android/app/build/
+android/.gradle/
+*.keystore
+*.jks
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# APK & build Capacitor (APK dibagikan lewat Google Drive / GitHub Release, bukan di-commit)
+android-app/dist/
+android-app/*.log
+android-app/www/
+android-app/android/app/src/main/assets/public/
+android-app/android/local.properties
+android-app/android/build/
+android-app/android/capacitor-cordova-android-plugins/build/
+
+# Arsip hasil Colab (isi sudah diekstrak ke pichanter_bgremoval*/ dan backend/models/)
+pichanter_hasil*.zip
+
+# APK yang diterbitkan untuk menu Unduh Aplikasi (dibuat ulang oleh npm run apk)
+backend/downloads/*.apk
+backend/downloads/*.apk.json
+
+# APK hasil build Flutter (dibagikan lewat Google Drive / GitHub Release)
+Android_Flutter/dist/

@@ -1,0 +1,165 @@
+{
+  "paper_acuan": "Shahi & Li (2023), IJNDI 2(2):100004, doi:10.53941/ijndi.2023.100004",
+  "dataset": "Kaggle nikhilroxtomar/person-segmentation",
+  "jumlah_data": {
+    "total": 5678,
+    "train": 4542,
+    "val": 567,
+    "test": 569
+  },
+  "config": {
+    "IMG_SIZE": 256,
+    "BACKBONE": "mobilenetv3large",
+    "ALPHA": 1.0,
+    "WEIGHTS": "imagenet",
+    "DECODER_FILTERS": [
+      128,
+      64,
+      48,
+      32
+    ],
+    "BN_MOMENTUM": 0.9,
+    "LOSS": "dice",
+    "BATCH": 8,
+    "EPOCHS": 100,
+    "LR": 0.0001,
+    "MIN_LR": 1e-07,
+    "PATIENCE_LR": 5,
+    "PATIENCE_ES": 10,
+    "SPLIT": [
+      0.8,
+      0.1,
+      0.1
+    ],
+    "THRESHOLD": 0.5,
+    "MIXED_PRECISION": false,
+    "SEED": 42,
+    "MAX_IMAGES": null,
+    "OUT_DIR": "/content/pichanter_bgremoval",
+    "DRIVE_DIR": "/content/drive/MyDrive/UTS_Pembelajaran_Mesin/pichanter_bgremoval"
+  },
+  "skip_layers": [
+    "re_lu_1",
+    "re_lu_5",
+    "activation_1",
+    "activation_13"
+  ],
+  "parameter": {
+    "total": 3543417,
+    "encoder": 2996352,
+    "decoder": 547065
+  },
+  "training": {
+    "epoch_dijalankan": 58,
+    "epoch_terbaik": 48,
+    "menit": 36.9
+  },
+  "test_mean": {
+    "dice": 0.911300003528595,
+    "iou": 0.8549000024795532,
+    "precision": 0.916700005531311,
+    "recall": 0.9248999953269958,
+    "pixel_acc": 0.9710000157356262,
+    "soft_dice": 0.9110000133514404,
+    "mad": 0.028999999165534973,
+    "mse": 0.028300000354647636
+  },
+  "test_std": {
+    "dice": 0.12389999628067017,
+    "iou": 0.16009999811649323,
+    "precision": 0.10859999805688858,
+    "recall": 0.13539999723434448,
+    "pixel_acc": 0.05810000002384186,
+    "soft_dice": 0.12399999797344208,
+    "mad": 0.05810000002384186,
+    "mse": 0.05790000036358833
+  },
+  "test_agregat": {
+    "dice_global": 0.9407,
+    "iou_global": 0.888,
+    "mad_global": 0.029,
+    "mse_global": 0.0283
+  },
+  "uji_ketahanan": [
+    {
+      "kondisi": "asli",
+      "dice": 0.9217000007629395,
+      "iou": 0.8669999837875366,
+      "mad": 0.022600000724196434,
+      "penurunan_dice": 0.0
+    },
+    {
+      "kondisi": "gelap (\u00d70,35)",
+      "dice": 0.9136999845504761,
+      "iou": 0.855400025844574,
+      "mad": 0.024800000712275505,
+      "penurunan_dice": 0.007899999618530273
+    },
+    {
+      "kondisi": "overexposed",
+      "dice": 0.8773999810218811,
+      "iou": 0.8014000058174133,
+      "mad": 0.040300000458955765,
+      "penurunan_dice": 0.04430000111460686
+    },
+    {
+      "kondisi": "noise \u03c3=20",
+      "dice": 0.8841999769210815,
+      "iou": 0.8134999871253967,
+      "mad": 0.03660000115633011,
+      "penurunan_dice": 0.03750000149011612
+    },
+    {
+      "kondisi": "blur r=3",
+      "dice": 0.7851999998092651,
+      "iou": 0.6876000165939331,
+      "mad": 0.07209999859333038,
+      "penurunan_dice": 0.13650000095367432
+    },
+    {
+      "kondisi": "JPEG q=15",
+      "dice": 0.8618000149726868,
+      "iou": 0.7842000126838684,
+      "mad": 0.04089999943971634,
+      "penurunan_dice": 0.05979999899864197
+    },
+    {
+      "kondisi": "grayscale",
+      "dice": 0.9041000008583069,
+      "iou": 0.8414000272750854,
+      "mad": 0.027899999171495438,
+      "penurunan_dice": 0.017500000074505806
+    }
+  ],
+  "format_ekspor": [
+    {
+      "format": "Keras fp32 (GPU)",
+      "ukuran_MB": 15.1447,
+      "dice": 0.9229999780654907,
+      "latensi_ms": 253.1674
+    },
+    {
+      "format": "TFLite fp32 (CPU 4 thread)",
+      "ukuran_MB": 14.0902,
+      "dice": 0.9229000210762024,
+      "latensi_ms": 9.2431
+    },
+    {
+      "format": "TFLite fp16 (CPU 4 thread)",
+      "ukuran_MB": 7.1488,
+      "dice": 0.9228000044822693,
+      "latensi_ms": 9.1229
+    },
+    {
+      "format": "TFLite int8dyn (CPU 4 thread)",
+      "ukuran_MB": 3.9248,
+      "dice": 0.9214000105857849,
+      "latensi_ms": 19.0928
+    }
+  ],
+  "deploy": {
+    "input": "RGB float32 0-255, shape [1,256,256,3], tanpa normalisasi",
+    "output": "probabilitas orang float32 0-1, shape [1,256,256,1]",
+    "threshold": 0.5
+  }
+}

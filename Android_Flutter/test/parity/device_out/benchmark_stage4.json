@@ -1,0 +1,37 @@
+{
+  "build_mode": "profile",
+  "model_version": "unet-mnv3l-384-fp16-v2",
+  "active_accelerator": "GPU (LiteRT)",
+  "p2_gpu_parity": {
+    "gpu_compiled": true,
+    "did_fallback_to_cpu": false,
+    "is_fully_accelerated": true,
+    "effective_accelerators": [
+      "gpu",
+      "cpu"
+    ],
+    "dice_vs_cpu": 1.0,
+    "mad_vs_cpu": 0.0,
+    "max_abs_diff": 0.00018,
+    "gpu_inference_ms": 15.38,
+    "cpu_inference_ms": 165.81,
+    "passed_p2": true,
+    "decision": "GPU LULUS paritas P2 (Dice=1.00000, 15.4 ms vs CPU 165.8 ms).",
+    "error": null
+  },
+  "l1_latency_12mp": {
+    "runs": 10,
+    "avg_preprocess_ms": 974.2,
+    "avg_inference_ms": 18.2,
+    "avg_postprocess_ms": 503.1,
+    "avg_total_ms": 1511.5,
+    "target_le_2000ms": true
+  },
+  "m1_memory_12mp": {
+    "runs": 5,
+    "start_rss_mb": 275.4,
+    "peak_rss_mb": 338.0,
+    "end_rss_mb": 336.3,
+    "target_le_400mb": true
+  }
+}

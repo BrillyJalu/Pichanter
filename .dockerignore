@@ -1,0 +1,10 @@
+# Hanya yang dibutuhkan image (daftar putih). Data training, APK, notebook, venv tidak ikut.
+*
+!backend/requirements.txt
+!backend/app/
+!backend/models/
+!backend/downloads/
+!mobile/
+!web/
+**/__pycache__
+**/*.pyc
