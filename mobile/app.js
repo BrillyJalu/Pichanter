@@ -4,10 +4,11 @@
 const { createApp } = Vue;
 
 const API = ((window.PICHANTER_CONFIG && window.PICHANTER_CONFIG.apiBase) || "").replace(/\/$/, "");
-const MAX_MB = 10;
+const MAX_MB = 10;            // batas server untuk file yang dikirim apa adanya
+const MAX_INPUT_MB = 40;      // batas file yang diperkecil dulu di HP
 const MAX_SIDE = 1600;
 const KEEP_ORIGINAL_MAX_BYTES = 3 * 1024 * 1024;
-const ACCEPT = ["image/jpeg", "image/png", "image/webp"];
+const IMAGE_EXT = ["jpg", "jpeg", "jfif", "png", "webp", "heic", "heif", "avif", "bmp", "gif", "tif", "tiff", "svg"];
 const HEALTH_INTERVAL_MS = 15000;
 
 const COLORS = [
@@ -34,21 +35,24 @@ window.addEventListener("beforeinstallprompt", (e) => {
 });
 
 // ---------------------------------------------------------------- utilitas gambar
-async function decodeImage(file) {
-  if ("createImageBitmap" in window) {
+/** Dekode di HP. Mengembalikan { src, done } atau melempar bila browser tidak mengenal formatnya (mis. HEIC). */
+async function decodeImage(file, svg) {
+  if (!svg && "createImageBitmap" in window) {
     try {
-      return await createImageBitmap(file, { imageOrientation: "from-image" });
+      const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+      return { src: bmp, done: () => bmp.close && bmp.close() };
     } catch (_) { /* lanjut ke cara lama */ }
   }
   const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.src = url;
   try {
-    const img = new Image();
-    img.src = url;
     await img.decode();
-    return img;
-  } finally {
+  } catch (e) {
     URL.revokeObjectURL(url);
+    throw e;
   }
+  return { src: img, done: () => URL.revokeObjectURL(url) };
 }
 
 function canvasToBlob(canvas, type, quality) {
@@ -56,44 +60,66 @@ function canvasToBlob(canvas, type, quality) {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob gagal"))), type, quality));
 }
 
-/** Validasi + perkecil foto di HP agar hemat kuota (PRD: sisi terpanjang 1600 px). */
+const tooBig = (file, limit) =>
+  ({ title: "Foto terlalu besar", msg: `Ukuran foto ${formatBytes(file.size)} melebihi batas ${limit} MB.` });
+
+/**
+ * Siapkan foto untuk diunggah. Semua format gambar diterima:
+ * - yang bisa dibaca browser (JPG, PNG, WEBP, AVIF, BMP, GIF, SVG, ...) diperkecil ke sisi terpanjang 1600 px
+ *   lalu dikirim sebagai JPEG (PRD: hemat kuota);
+ * - yang tidak bisa dibaca browser HP (HEIC/HEIF, TIFF) dikirim apa adanya dan dikonversi di server.
+ */
 async function preparePhoto(file) {
   const ext = (file.name.split(".").pop() || "").toLowerCase();
-  const typeOk = file.type ? ACCEPT.includes(file.type) : ["jpg", "jpeg", "png", "webp"].includes(ext);
-  if (!typeOk) {
-    throw { title: "Format tidak didukung", msg: `File ${file.name || ""} bukan JPG, PNG, atau WEBP.` };
+  const svg = file.type === "image/svg+xml" || ext === "svg";
+  if (file.type && !file.type.startsWith("image/") && !IMAGE_EXT.includes(ext)) {
+    throw { title: "Bukan file gambar", msg: `${file.name || "File ini"} bukan foto. Pilih file gambar (JPG, PNG, HEIC, dll.).` };
   }
-  if (file.size > MAX_MB * 1024 * 1024) {
-    throw { title: "Foto terlalu besar", msg: `Ukuran foto ${formatBytes(file.size)} melebihi batas ${MAX_MB} MB.` };
+  if (file.size > MAX_INPUT_MB * 1024 * 1024) throw tooBig(file, MAX_INPUT_MB);
+
+  let dec = null;
+  try {
+    dec = await decodeImage(file, svg);
+  } catch (_) { /* format tidak dikenal browser */ }
+
+  if (!dec) {
+    if (svg) throw { title: "SVG tidak bisa dibaca", msg: "File SVG rusak atau memuat isi yang tidak didukung. Coba file lain." };
+    if (file.size > MAX_MB * 1024 * 1024) throw tooBig(file, MAX_MB);
+    return {
+      blob: file, url: null, serverConvert: true,
+      label: (ext || (file.type.split("/")[1] || "")).toUpperCase(),
+      width: null, height: null, origWidth: null, origHeight: null, resized: false,
+    };
   }
 
-  let bmp;
-  try {
-    bmp = await decodeImage(file);
-  } catch (_) {
-    throw { title: "Foto tidak bisa dibaca", msg: "File rusak atau formatnya tidak dikenali. Coba foto lain." };
-  }
-  const origWidth = bmp.naturalWidth || bmp.width;
-  const origHeight = bmp.naturalHeight || bmp.height;
-  const scale = Math.min(1, MAX_SIDE / Math.max(origWidth, origHeight));
-  const width = Math.round(origWidth * scale);
-  const height = Math.round(origHeight * scale);
+  let origWidth = dec.src.naturalWidth || dec.src.width;
+  let origHeight = dec.src.naturalHeight || dec.src.height;
+  if (!origWidth || !origHeight) origWidth = origHeight = MAX_SIDE; // SVG tanpa ukuran
+  // SVG berupa vektor: selalu digambar dengan sisi terpanjang 1600 px.
+  const scale = svg ? MAX_SIDE / Math.max(origWidth, origHeight) : Math.min(1, MAX_SIDE / Math.max(origWidth, origHeight));
+  const width = Math.max(1, Math.round(origWidth * scale));
+  const height = Math.max(1, Math.round(origHeight * scale));
 
   let blob = file;
-  if (scale < 1 || file.type !== "image/jpeg" || file.size > KEEP_ORIGINAL_MAX_BYTES) {
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#fff"; // PNG transparan → latar putih sebelum jadi JPEG
-    ctx.fillRect(0, 0, width, height);
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(bmp, 0, 0, width, height);
-    blob = await canvasToBlob(canvas, "image/jpeg", 0.92);
+  try {
+    if (svg || scale < 1 || file.type !== "image/jpeg" || file.size > KEEP_ORIGINAL_MAX_BYTES) {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff"; // gambar transparan → latar putih sebelum jadi JPEG
+      ctx.fillRect(0, 0, width, height);
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(dec.src, 0, 0, width, height);
+      blob = await canvasToBlob(canvas, "image/jpeg", 0.92);
+    }
+  } catch (_) {
+    throw { title: "Foto tidak bisa dibaca", msg: "File rusak atau formatnya tidak dikenali. Coba foto lain." };
+  } finally {
+    dec.done();
   }
-  if (bmp.close) bmp.close();
 
-  return { blob, url: URL.createObjectURL(blob), width, height, origWidth, origHeight, resized: scale < 1 };
+  return { blob, url: URL.createObjectURL(blob), width, height, origWidth, origHeight, resized: !svg && scale < 1 };
 }
 
 function apiError(status, body) {
@@ -263,7 +289,7 @@ const app = createApp({
       if (this.screen === "home") this.reset();
     },
     reset() {
-      if (this.photo) URL.revokeObjectURL(this.photo.url);
+      if (this.photo && this.photo.url && this.photo.url.startsWith("blob:")) URL.revokeObjectURL(this.photo.url);
       this.photo = null;
       this.job = null;
       this.bg = null;
@@ -299,6 +325,8 @@ const app = createApp({
       try {
         const job = await uploadPhoto(this.photo.blob, (p) => (this.progress = p), () => (this.phase = "process"));
         await preload(API + job.result_url);
+        // HEIC dkk. tidak bisa ditampilkan di HP: pakai foto asli yang sudah dikonversi server (JPG/PNG).
+        if (!this.photo.url) this.photo.url = API + job.original_url;
         this.clientMs = performance.now() - t0;
         this.job = job;
         this.bg = null;

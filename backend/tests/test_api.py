@@ -89,10 +89,40 @@ def test_t4_rejects_oversized_file(client):
     assert client.get("/api/health").json()["status"] == "ok"   # server tetap jalan
 
 
+def test_phone_and_common_formats_accepted(client):
+    """Foto HP (HEIC, MPO Samsung, AVIF) dan format umum lain diterima; aslinya disimpan sebagai JPG/PNG."""
+    import pillow_heif  # noqa: F401 - mendaftarkan encoder HEIF untuk membuat contoh foto
+
+    cases = [("HEIF", "foto.heic", "image/heic", "image/jpeg"),
+             ("MPO", "foto.jpg", "image/jpeg", "image/jpeg"),
+             ("AVIF", "foto.avif", "image/avif", "image/jpeg"),
+             ("BMP", "foto.bmp", "image/bmp", "image/jpeg"),
+             ("GIF", "foto.gif", "image/gif", "image/jpeg"),
+             ("TIFF", "foto.tif", "image/tiff", "image/jpeg")]
+    for fmt, name, ctype, original_type in cases:
+        r = post(client, make_photo(240, 180, fmt=fmt), name=name, ctype=ctype)
+        assert r.status_code == 201, (fmt, r.text)
+        job = r.json()
+        assert (job["width"], job["height"]) == (240, 180), fmt
+        orig = client.get(job["original_url"])
+        assert orig.headers["content-type"] == original_type, fmt
+        assert Image.open(io.BytesIO(orig.content)).size == (240, 180), fmt
+
+
+def test_converted_transparent_original_kept_as_png(client):
+    buf = io.BytesIO()
+    Image.new("RGBA", (64, 64), (0, 0, 0, 0)).save(buf, format="TIFF")
+    job = post(client, buf.getvalue(), name="logo.tif", ctype="image/tiff").json()
+    assert client.get(job["original_url"]).headers["content-type"] == "image/png"
+
+
 def test_rejects_unsupported_image_format(client):
     buf = io.BytesIO()
-    Image.new("RGB", (50, 50)).save(buf, format="GIF")
-    assert post(client, buf.getvalue(), name="a.gif", ctype="image/gif").status_code == 415
+    Image.new("RGB", (32, 32)).save(buf, format="ICO")
+    r = post(client, buf.getvalue(), name="a.ico", ctype="image/x-icon")
+    assert r.status_code == 415 and "HEIC" in r.json()["detail"]
+    svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'
+    assert post(client, svg, name="a.svg", ctype="image/svg+xml").status_code == 415
 
 
 def test_invalid_source_rejected(client):

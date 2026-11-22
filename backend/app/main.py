@@ -19,7 +19,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from . import config, db
 from .ml import engine
@@ -28,7 +28,17 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("pichanter.api")
 
 Image.MAX_IMAGE_PIXELS = config.MAX_PIXELS
-ALLOWED_FORMATS = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp"}
+try:  # foto HEIC/HEIF (bawaan banyak HP Samsung, Xiaomi, dan iPhone)
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:  # pragma: no cover - tanpa pillow-heif, HEIC ditolak dengan 415
+    log.warning("pillow-heif tidak terpasang; foto HEIC/HEIF tidak didukung")
+
+# Disimpan apa adanya (bisa langsung ditampilkan browser). MPO = JPEG multi-gambar dari kamera HP.
+PASSTHROUGH_FORMATS = {"JPEG": "jpg", "MPO": "jpg", "PNG": "png", "WEBP": "webp"}
+# Dibaca lalu disimpan ulang sebagai JPG (atau PNG bila transparan) agar bisa ditampilkan di semua browser.
+CONVERT_FORMATS = {"HEIF", "AVIF", "BMP", "GIF", "TIFF"}
+FORMATS_TEXT = "JPG, PNG, WEBP, HEIC, AVIF, BMP, GIF, atau TIFF"
 MEDIA_TYPES = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 FIG_RE = re.compile(r"^fig_[\w\-]+\.png$")
 THUMB_SIDE = 480
@@ -150,18 +160,32 @@ def read_upload(file: UploadFile) -> bytes:
     return data
 
 
-def open_image(data: bytes) -> tuple[Image.Image, str]:
+def open_image(data: bytes) -> tuple[Image.Image, str, bytes]:
+    """Buka foto unggahan. Mengembalikan (gambar, ekstensi simpan, byte foto asli yang disimpan)."""
     try:
         img = Image.open(io.BytesIO(data))
         fmt = img.format
+        if getattr(img, "n_frames", 1) > 1:
+            img.seek(0)  # GIF/TIFF/MPO berlapis: pakai gambar pertama
         img.load()
     except Image.DecompressionBombError:
         raise HTTPException(413, "Resolusi gambar terlalu besar.")
-    except (UnidentifiedImageError, OSError, SyntaxError):
-        raise HTTPException(415, "File bukan gambar yang valid. Gunakan JPG, PNG, atau WEBP.")
-    if fmt not in ALLOWED_FORMATS:
-        raise HTTPException(415, f"Format {fmt} tidak didukung. Gunakan JPG, PNG, atau WEBP.")
-    return img, ALLOWED_FORMATS[fmt]
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError):
+        raise HTTPException(415, f"File bukan gambar yang bisa dibaca. Gunakan {FORMATS_TEXT}.")
+    if fmt in PASSTHROUGH_FORMATS:
+        return img, PASSTHROUGH_FORMATS[fmt], data
+    if fmt not in CONVERT_FORMATS:
+        raise HTTPException(415, f"Format {fmt} tidak didukung. Gunakan {FORMATS_TEXT}.")
+
+    img = ImageOps.exif_transpose(img)
+    transparent = img.mode in ("RGBA", "LA", "PA") or (img.mode == "P" and "transparency" in img.info)
+    img = img.convert("RGBA" if transparent else "RGB")
+    buf = io.BytesIO()
+    if transparent:
+        img.save(buf, "PNG", compress_level=3)
+        return img, "png", buf.getvalue()
+    img.save(buf, "JPEG", quality=92)
+    return img, "jpg", buf.getvalue()
 
 
 # ---------------------------------------------------------------- API
@@ -179,7 +203,7 @@ def health():
 
 @app.post("/api/jobs", tags=["jobs"], status_code=201, summary="Hapus background satu foto")
 def create_job(
-    file: UploadFile = File(..., description="Foto JPG/PNG/WEBP, maks. 10 MB"),
+    file: UploadFile = File(..., description="Foto JPG/PNG/WEBP/HEIC/AVIF/BMP/GIF/TIFF, maks. 10 MB"),
     source: Literal["mobile", "web"] = Form("web", description="Asal permintaan"),
 ):
     t0 = time.perf_counter()
@@ -187,7 +211,7 @@ def create_job(
         raise HTTPException(503, f"Model belum siap di server: {engine.error}")
 
     data = read_upload(file)
-    img, ext = open_image(data)
+    img, ext, original = open_image(data)
 
     job_id = str(uuid.uuid4())
     created = datetime.now(timezone.utc)
@@ -200,7 +224,7 @@ def create_job(
     }
     folder = config.STORAGE_DIR / job_id
     folder.mkdir(parents=True)
-    (folder / f"original.{ext}").write_bytes(data)
+    (folder / f"original.{ext}").write_bytes(original)
     job["original_path"] = f"{job_id}/original.{ext}"
 
     try:

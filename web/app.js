@@ -8,7 +8,28 @@ const POLL_MS = 3000;
 const HEALTH_MS = 15000;
 const HISTORY_LIMIT = 60;
 const MAX_MB = 10;
-const ACCEPT = ["image/jpeg", "image/png", "image/webp"];
+const IMAGE_EXT = ["jpg", "jpeg", "jfif", "png", "webp", "heic", "heif", "avif", "bmp", "gif", "tif", "tiff", "svg"];
+
+/** SVG tidak bisa dibaca server: gambar di browser menjadi PNG (sisi terpanjang 1600 px). */
+async function rasterizeSvg(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    let w = img.naturalWidth, h = img.naturalHeight;
+    if (!w || !h) w = h = 1600;
+    const scale = 1600 / Math.max(w, h);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(w * scale));
+    canvas.height = Math.max(1, Math.round(h * scale));
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((ok, fail) => canvas.toBlob((b) => (b ? ok(b) : fail(new Error("toBlob"))), "image/png"));
+    return new File([blob], file.name.replace(/\.svg$/i, "") + ".png", { type: "image/png" });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 // Target dari PRD; angka paper dari Shahi & Li (2023).
 const KPI_DEFS = [
@@ -274,12 +295,21 @@ createApp({
       const f = e.dataTransfer.files && e.dataTransfer.files[0];
       if (f) this.upload(f);
     },
-    upload(file) {
+    async upload(file) {
       if (this.uploading) return;
       this.error = null;
-      if (file.type && !ACCEPT.includes(file.type)) {
-        this.error = { title: "Format tidak didukung.", msg: `${file.name} bukan JPG, PNG, atau WEBP.` };
+      const ext = (file.name.split(".").pop() || "").toLowerCase();
+      if (file.type && !file.type.startsWith("image/") && !IMAGE_EXT.includes(ext)) {
+        this.error = { title: "Bukan file gambar.", msg: `${file.name} bukan foto. Pilih JPG, PNG, HEIC, WEBP, atau format gambar lain.` };
         return;
+      }
+      if (file.type === "image/svg+xml" || ext === "svg") {
+        try {
+          file = await rasterizeSvg(file);
+        } catch (_) {
+          this.error = { title: "SVG tidak bisa dibaca.", msg: "File SVG rusak atau memuat isi yang tidak didukung." };
+          return;
+        }
       }
       if (file.size > MAX_MB * 1024 * 1024) {
         this.error = { title: "Foto terlalu besar.", msg: `Batas ukuran ${MAX_MB} MB.` };

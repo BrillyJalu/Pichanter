@@ -170,7 +170,15 @@ h1 { margin: 8px 0 0; font-size: 28px; line-height: 1.2; letter-spacing: -.02em;
   border-radius: var(--radius); overflow: hidden; background: var(--surface-2); box-shadow: var(--shadow);
 }
 .stage img { display: block; max-width: 100%; max-height: 62dvh; object-fit: contain; transition: opacity .2s, filter .2s; }
-.stage img.dim { filter: saturate(.6) brightness(.85); }
+.stage img.dim, .no-preview.dim { filter: saturate(.6) brightness(.85); }
+.no-preview {
+  display: grid; justify-items: center; gap: 6px; padding: 48px 24px; text-align: center; color: var(--text);
+}
+.no-preview svg {
+  width: 48px; height: 48px; margin-bottom: 6px; fill: none; stroke: var(--primary); stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.no-preview small { max-width: 30ch; color: var(--muted); font-size: 13px; line-height: 1.45; }
 .stage.result, .stage.result img { max-height: 50dvh; }
 .stage.result { touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer; }
 .stage-tag {

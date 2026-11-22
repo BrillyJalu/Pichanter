@@ -2,7 +2,8 @@ fastapi>=0.115
 uvicorn[standard]>=0.30
 python-multipart>=0.0.9
 python-dotenv>=1.0
-pillow>=10.4
+pillow>=11.3          # 11.3+ sudah bisa membaca AVIF
+pillow-heif>=0.22     # foto HEIC/HEIF dari HP
 numpy>=1.26
 # Runtime TFLite (Linux, macOS, dan Windows sejak 2.x). Cadangan opsional: `pip install onnxruntime`
 # lalu taruh pichanter_bg.onnx di models/ (lihat app/ml.py).

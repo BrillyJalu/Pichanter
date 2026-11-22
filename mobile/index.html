@@ -71,10 +71,10 @@
       <p v-if="preparing" class="hint center">Menyiapkan foto…</p>
 
       <input ref="camera" type="file" accept="image/*" capture="environment" hidden @change="onFile">
-      <input ref="gallery" type="file" accept="image/jpeg,image/png,image/webp" hidden @change="onFile">
+      <input ref="gallery" type="file" accept="image/*" hidden @change="onFile">
 
       <p class="fineprint">
-        JPG, PNG, atau WEBP, maks. 10 MB. Foto diproses di server Pichanter, tidak dikirim ke pihak ketiga,
+        JPG, PNG, HEIC, WEBP, dan format gambar lain. Foto diproses di server Pichanter, tidak dikirim ke pihak ketiga,
         dan dihapus otomatis setelah 24 jam.
       </p>
 
@@ -101,7 +101,12 @@
     <!-- ===== Pratinjau & proses ===== -->
     <section v-else-if="screen === 'preview' && photo" class="screen">
       <div class="stage">
-        <img :src="photo.url" alt="Foto yang dipilih" :class="{ dim: busy }">
+        <img v-if="photo.url" :src="photo.url" alt="Foto yang dipilih" :class="{ dim: busy }">
+        <div v-else class="no-preview" :class="{ dim: busy }">
+          <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9.5" r="1.5"/><path d="M20 15l-4.5-4.5L6 20"/></svg>
+          <b>Foto {{ photo.label }} siap diproses</b>
+          <small>Pratinjau belum tersedia untuk format ini. Foto akan dikonversi di server.</small>
+        </div>
         <div v-if="busy" class="processing">
           <div class="scanline"></div>
           <div class="processing-label">
@@ -113,7 +118,7 @@
       </div>
 
       <p class="meta">
-        {{ photo.width }}×{{ photo.height }} px · {{ formatBytes(photo.blob.size) }}
+        <template v-if="photo.width">{{ photo.width }}×{{ photo.height }} px · </template>{{ formatBytes(photo.blob.size) }}
         <template v-if="photo.resized"> · diperkecil dari {{ photo.origWidth }}×{{ photo.origHeight }}</template>
       </p>
 

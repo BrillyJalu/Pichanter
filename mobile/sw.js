@@ -1,6 +1,6 @@
 // Service worker Pichanter: tampilan aplikasi tetap terbuka saat offline.
 // Strategi network-first untuk file aplikasi; /api/ tidak pernah di-cache.
-const CACHE = "pichanter-mobile-v3";
+const CACHE = "pichanter-mobile-v4";
 const SHELL = [
   "./",
   "./index.html",
