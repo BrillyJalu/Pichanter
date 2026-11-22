@@ -36,6 +36,18 @@ docker compose ps
 echo "health container: \$s"
 docker exec pichanter python -c "import urllib.request;print(urllib.request.urlopen('http://127.0.0.1:8000/api/health').read().decode())"
 [ "\$s" = healthy ] || { echo "Container belum sehat. Log:"; docker compose logs --tail 40 pichanter; exit 1; }
+echo "==> Cek fitur hapus riwayat (DELETE /api/jobs/{id})"
+docker exec -i pichanter python - <<'PY'
+import urllib.error, urllib.request
+req = urllib.request.Request("http://127.0.0.1:8000/api/jobs/cek-deploy-tidak-ada", method="DELETE")
+try:
+    urllib.request.urlopen(req)
+    code = 200
+except urllib.error.HTTPError as e:
+    code = e.code
+print("hapus riwayat:", "aktif" if code == 404 else f"TIDAK aktif (HTTP {code}), kode lama masih berjalan?")
+raise SystemExit(0 if code == 404 else 1)
+PY
 EOF
 )
 

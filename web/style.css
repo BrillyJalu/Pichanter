@@ -109,6 +109,12 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .btn.primary:hover { background: var(--primary-hover); }
 .btn.secondary { background: var(--surface); border-color: var(--border); color: var(--text); }
 .btn.secondary:hover { border-color: var(--muted); }
+.btn.icon { padding: 0; width: 34px; flex: none; }
+.btn.danger { color: var(--bad); }
+.btn.danger:hover { border-color: var(--bad); background: var(--bad-soft); }
+.btn.danger-solid { background: var(--bad); color: var(--surface); }
+.btn.danger-solid:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .6; cursor: progress; }
 .link { border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; margin-left: auto; }
 
 .filters { display: flex; gap: 6px; }
@@ -152,6 +158,8 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .card-meta { display: flex; flex-wrap: wrap; justify-content: space-between; column-gap: 8px; font-size: 13.5px; font-weight: 600; }
 .card-meta > * { white-space: nowrap; }
 .card-meta.muted { color: var(--muted); font-weight: 500; font-size: 12.5px; margin-bottom: 8px; }
+.card-actions { display: flex; gap: 6px; }
+.card-actions .btn:first-child { flex: 1; }
 .card-meta.muted span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .empty { text-align: center; padding: 56px 24px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
@@ -268,6 +276,11 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .dialog .qr { width: 220px; margin: 0 auto; padding: 8px; background: #fff; border-radius: 12px; }
 .dialog .qr svg { width: 100%; height: auto; display: block; }
 .dialog .url { margin: 12px 0 18px; color: var(--text); word-break: break-all; }
+.del-thumb { width: 96px; height: 120px; margin: 0 auto 14px; display: grid; place-items: center; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+.del-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.dialog-error { color: var(--bad) !important; font-weight: 600; }
+.dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.delete-job { margin-top: 14px; }
 .lightbox { margin: 0; max-width: min(1200px, 100%); cursor: zoom-out; }
 .lightbox img { max-width: 100%; max-height: calc(100vh - 100px); display: block; margin: 0 auto; border-radius: 10px; background: #fff; }
 .lightbox figcaption { text-align: center; color: #fff; margin-top: 10px; font-size: 14px; }

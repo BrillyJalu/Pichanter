@@ -65,6 +65,13 @@ def get_job(job_id: str) -> dict | None:
     return dict(row) if row else None
 
 
+def delete_job(job_id: str) -> dict | None:
+    """Hapus satu baris dan kembalikan isinya (None bila tidak ada) agar file-nya ikut dihapus."""
+    with connect() as c:
+        row = c.execute("DELETE FROM jobs WHERE id = ? RETURNING *", (job_id,)).fetchone()
+    return dict(row) if row else None
+
+
 def list_jobs(limit: int = 20, source: str | None = None) -> list[dict]:
     q, args = "SELECT * FROM jobs WHERE status = 'ok'", []
     if source:

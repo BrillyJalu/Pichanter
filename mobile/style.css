@@ -134,6 +134,8 @@ h1 { margin: 8px 0 0; font-size: 28px; line-height: 1.2; letter-spacing: -.02em;
 .btn.primary:hover:not(:disabled) { background: var(--primary-hover); }
 .btn.secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
 .btn.ghost { background: transparent; color: var(--muted); }
+.btn.danger { color: var(--danger); }
+.btn.danger-solid { background: var(--danger); color: var(--surface); }
 
 /* ---------------------------------------------------------------- beranda: demo animasi */
 .demo {
@@ -262,6 +264,7 @@ h1 { margin: 8px 0 0; font-size: 28px; line-height: 1.2; letter-spacing: -.02em;
   background: var(--surface); box-shadow: var(--shadow); animation: rise .2s ease-out;
 }
 .sheet h2 { margin: 0; font-size: 20px; }
+.sheet-text { margin: -4px 0 4px; color: var(--muted); }
 .steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; }
 .steps li::marker { color: var(--muted); font-weight: 700; }
 

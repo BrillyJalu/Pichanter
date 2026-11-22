@@ -79,6 +79,7 @@ File `.env` dan data foto di volume `pichanter-data` tidak disentuh.
 | `https://pichanter.jalulabs.my.id/api/health` | `"model_loaded": true`, `"placeholder": false`, `model_version` `unet-mnv3l-384-fp16-v2` |
 | Buka `/` di laptop | Dashboard; halaman Info Model menampilkan metrik v2 dan 12 grafik |
 | Buka `/app/` di HP | Bisa ambil atau pilih foto, background terhapus dalam ±1–3 detik |
+| Hapus satu foto (ikon tempat sampah di Riwayat, atau "Hapus dari riwayat" di HP) | Foto hilang dari database dan file server; dashboard lain ikut terbarui ±3 detik. `deploy.sh` mengecek endpoint ini otomatis ("hapus riwayat: aktif") |
 | APK `android-app/dist/pichanter.apk` | Terbuka langsung ke `/app/` (tanpa build ulang) |
 
 ## Perintah berguna di server

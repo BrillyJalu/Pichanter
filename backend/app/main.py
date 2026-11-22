@@ -75,7 +75,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="Pichanter API",
-    version="1.0.0",
+    version="1.2.0",
     description="Hapus background foto orang dengan U-Net + MobileNetV3 (TFLite). "
                 "Dipakai bersama oleh aplikasi mobile (PWA/APK) dan dashboard web.",
     lifespan=lifespan,
@@ -273,6 +273,18 @@ def list_jobs(
 @app.get("/api/jobs/{job_id}", tags=["jobs"], summary="Detail satu job")
 def get_job(job_id: str):
     return job_out(require_job(job_id))
+
+
+@app.delete("/api/jobs/{job_id}", tags=["jobs"], status_code=204, summary="Hapus satu foto dari riwayat",
+            description="Menghapus baris di database beserta foto asli, mask, hasil, dan thumbnail di server. "
+                        "Dashboard dan perangkat lain ikut tidak menampilkannya pada pembaruan berikutnya.")
+def delete_job(job_id: str):
+    j = db.delete_job(job_id)
+    if not j:
+        raise HTTPException(404, "Job tidak ditemukan atau sudah dihapus.")
+    shutil.rmtree(config.STORAGE_DIR / j["id"], ignore_errors=True)
+    log.info("job=%s dihapus manual (source=%s)", j["id"], j["source"])
+    return Response(status_code=204)
 
 
 @app.get("/api/jobs/{job_id}/result.png", tags=["jobs"], summary="Unduh hasil ukuran asli",

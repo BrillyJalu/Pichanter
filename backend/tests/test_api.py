@@ -219,3 +219,23 @@ def test_download_apk_with_metadata(client, tmp_path, monkeypatch):
     assert "attachment" in r.headers["content-disposition"] and "pichanter.apk" in r.headers["content-disposition"]
     assert client.get("/download/lain.apk").status_code == 404           # hanya nama yang dikonfigurasi
     assert client.get("/download/..%2Fmodels%2Fx").status_code == 404
+
+
+def test_delete_job_removes_row_files_and_history(client, tmp_root):
+    keep = post(client, make_photo(100, 100), source="web").json()
+    job = post(client, make_photo(100, 100)).json()
+    client.get(job["thumb_url"])                                  # thumbnail ikut dibuat
+    folder = tmp_root / "storage" / job["id"]
+    assert folder.exists()
+
+    r = client.delete(f"/api/jobs/{job['id']}")
+    assert r.status_code == 204
+    assert not folder.exists()
+    assert db.get_job(job["id"]) is None
+    assert client.get(f"/api/jobs/{job['id']}").status_code == 404
+    assert client.get(job["result_url"]).status_code == 404
+    ids = [j["id"] for j in client.get("/api/jobs", params={"limit": 100}).json()]
+    assert job["id"] not in ids and keep["id"] in ids              # foto lain tidak tersentuh
+    assert client.delete(f"/api/jobs/{job['id']}").status_code == 404
+    assert client.delete("/api/jobs/tidak-ada").status_code == 404
+    assert client.delete("/api/jobs/..%2F..%2Fmodels").status_code in (404, 405)   # tidak pernah keluar folder storage

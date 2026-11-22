@@ -101,6 +101,7 @@ docker compose up -d --build       # http://172.17.0.1:8010, atau set PICHANTER_
 |---|---|---|
 | `POST` | `/api/jobs` | Unggah foto, kembalikan hasil hapus background |
 | `GET` | `/api/jobs`, `/api/jobs/{id}` | Riwayat dan detail hasil |
+| `DELETE` | `/api/jobs/{id}` | Hapus satu foto dari riwayat (baris database + semua file-nya), balasan 204 |
 | `GET` | `/api/model` | Info dan metrik model |
 | `GET` | `/api/health` | Status server dan model |
 

@@ -122,6 +122,11 @@ createApp({
         { id: "ios", label: "iPhone" },
         { id: "laptop", label: "Laptop" },
       ],
+      // hapus riwayat
+      confirmDel: null,
+      deleting: false,
+      deleteError: null,
+      deletedIds: new Set(),
       // dialog
       qrOpen: false,
       lightbox: null,
@@ -179,7 +184,7 @@ createApp({
   mounted() {
     window.addEventListener("hashchange", () => (this.route = parseRoute()));
     window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") { this.qrOpen = false; this.lightbox = null; }
+      if (e.key === "Escape") { this.qrOpen = false; this.lightbox = null; if (!this.deleting) this.confirmDel = null; }
     });
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") { this.checkHealth(); this.tick(); }
@@ -258,7 +263,8 @@ createApp({
     },
     async loadHistory() {
       try {
-        const all = await getJSON(`/api/jobs?limit=${HISTORY_LIMIT}`);
+        // deletedIds: buang kartu yang baru dihapus bila respons polling dikirim sebelum hapus selesai
+        const all = (await getJSON(`/api/jobs?limit=${HISTORY_LIMIT}`)).filter((j) => !this.deletedIds.has(j.id));
         this.counts = {
           all: all.length,
           mobile: all.filter((j) => j.source === "mobile").length,
@@ -281,6 +287,34 @@ createApp({
         this.historyOk = false;
       } finally {
         this.historyLoaded = true;
+      }
+    },
+
+    // ----- hapus satu foto (database + file di server; perangkat lain ikut terbarui lewat polling)
+    askDelete(job) {
+      this.deleteError = null;
+      this.confirmDel = job;
+    },
+    async confirmDelete() {
+      const job = this.confirmDel;
+      if (!job || this.deleting) return;
+      this.deleting = true;
+      this.deleteError = null;
+      try {
+        const r = await fetch(`/api/jobs/${encodeURIComponent(job.id)}`, { method: "DELETE" });
+        if (!r.ok && r.status !== 404) { // 404 = sudah terhapus (kedaluwarsa / dihapus dari perangkat lain)
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body.detail || "HTTP " + r.status);
+        }
+        this.deletedIds.add(job.id);
+        this.jobs = this.jobs.filter((j) => j.id !== job.id);
+        this.confirmDel = null;
+        if (this.route.name === "job") location.hash = "#/";
+        else this.loadHistory();
+      } catch (e) {
+        this.deleteError = e instanceof TypeError ? "Server offline. Coba lagi." : e.message;
+      } finally {
+        this.deleting = false;
       }
     },
 

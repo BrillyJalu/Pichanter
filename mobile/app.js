@@ -229,6 +229,8 @@ const app = createApp({
       customColor: "#2E7D32",
       comparing: false,
       saving: false,
+      confirmDel: false,
+      deleting: false,
       canShare: false,
       toast: "",
       server: { online: null, ready: false, placeholder: false, version: null },
@@ -333,6 +335,7 @@ const app = createApp({
     },
     onPopState(e) {
       this.installHelp = false;
+      if (!this.deleting) this.confirmDel = false;
       if (this.busy) { history.pushState({ screen: this.screen }, ""); return; }
       const target = (e.state && e.state.screen) || "home";
       this.screen = target === "result" && !this.job ? "home" : target;
@@ -511,6 +514,26 @@ const app = createApp({
         this.error = err.title ? err : nat ? this.nativeError(err, "Gagal membagikan") : { title: "Gagal membagikan", msg: String(err.message || err) };
       } finally {
         this.saving = false;
+      }
+    },
+
+    // ----- hapus dari riwayat (database + file di server; dashboard web ikut terbarui)
+    async deleteJob() {
+      if (!this.job || this.deleting) return;
+      this.deleting = true;
+      this.error = null;
+      try {
+        const r = await fetch(`${API}/api/jobs/${encodeURIComponent(this.job.id)}`, { method: "DELETE" });
+        if (!r.ok && r.status !== 404) throw apiError(r.status, await r.json().catch(() => ({})));
+        this.confirmDel = false;
+        this.deleting = false;
+        this.showToast("Foto dihapus dari riwayat");
+        this.goHome();
+      } catch (err) {
+        this.confirmDel = false;
+        this.error = err.title ? err : OFFLINE;
+      } finally {
+        this.deleting = false;
       }
     },
 
